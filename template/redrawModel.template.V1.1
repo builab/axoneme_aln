@@ -1,0 +1,63 @@
+%-------------------------------------------------------------
+% TEMPLATE
+% @purpose redrawModel from generated alignment parameters
+% @version 1.1
+% @date 20101101
+% @update Elliptical parameter included
+%-------------------------------------------------------------
+%%% --- START HEADER ---
+listFile = #s#ListFile#; 
+pixelSize = #d#PixelSize#;
+sortDim = #d#SortDim#;
+%%% --- END HEADER -----
+
+% ---- Program default ---------
+starDir = 'star';
+docDir = 'doc';
+graphDir = 'graph';
+initDocPrefix = 'doc_total_';
+smoothingLimit = 13;
+exclusionLimit = .1;
+doOutputInfo = 1;
+% ------------------------------
+
+disp(['List File: ' listFile])
+disp(['Sort Dim: ' num2str(sortDim)])
+disp(['Pixel Size: ' num2str(pixelSize)])
+
+
+[mtbList, numberOfRecords] = parse_list(listFile);
+flagellaList = parse_flagella_name_from_list(mtbList);
+
+for i = 1:numel(flagellaList)
+    flagName = flagellaList{i};
+    [doubletList, subMtbList] = get_doublet_list(mtbList, numberOfRecords, flagName);
+
+    ptsList = {};
+    for doubletId = doubletList
+        starFile = [starDir '/' subMtbList{2}{doubletId} '.star'];
+        docInitFile = [docDir '/' initDocPrefix subMtbList{1}{doubletId} '.spi'];
+        disp(['Reading ' starFile]);
+        disp(['Reading ' docInitFile]);
+
+        origins = parse_star_file(starFile, 'origin');
+        transform = parse_spider_doc(docInitFile);
+        good_origin_indx = transform(:,7) > exclusionLimit;
+        origins = origins(good_origin_indx, :);
+        transform = transform(good_origin_indx, :);
+        origins_corrected = transform_pts(origins, transform);
+        ptsList{doubletId} = origins_corrected;
+    end
+    
+    flagellaModel = flagella_model_from_pts(ptsList, doubletList, subMtbList{3}(doubletList(1)), sortDim, smoothingLimit, pixelSize);
+    
+    for doubletId = doubletList
+	docInitFile = [docDir '/' initDocPrefix subMtbList{1}{doubletId} '.spi'];
+	transform = parse_spider_doc(docInitFile);
+	flagellaModel(doubletId).IndRotAng = transform(:,1:6);
+    end	
+
+    draw_flagella_model(flagellaModel, doubletList, flagName, [graphDir '/' flagName '_model.tif'], [graphDir '/' flagName '_model_cs.tif'], doOutputInfo);
+end
+
+exit;

@@ -1,0 +1,64 @@
+%-------------------------------------------------------------
+% TEMPLATE
+% @purpose Generate initial document with estimated Euler angles
+% @version 1.1
+% @date 20080301
+% @update 20111102 using the new flagella_model function
+%-------------------------------------------------------------
+%%% --- START HEADER ---
+listFile = #s#ListFile#;
+pixelSize = #d#PixelSize#;
+sortDim = #d#SortDim#;
+doGuessPsi= #d#DoGuessPsi#;
+%%% --- END HEADER -----
+
+% ---- Program default ---------
+starDir = 'star';
+docDir = 'doc';
+graphDir = 'graph';
+initDocPrefix = 'doc_init_';
+smoothingLimit = 13;
+% ------------------------------
+
+disp(['List File: ' listFile])
+disp(['Sort Dim: ' num2str(sortDim)])
+disp(['Pixel Size: ' num2str(pixelSize)])
+
+[mtb_list, number_of_records] = parse_list(listFile);
+flagellaList = parse_flagella_name_from_list(mtb_list);
+
+for i = 1:numel(flagellaList)
+    flagName = flagellaList{i};
+    [doublet_list, sub_mtb_list] = get_doublet_list(mtb_list, number_of_records, flagName);
+    ptsList = {};
+    for doubletId = doublet_list
+        starFile = [starDir '/' sub_mtb_list{2}{doubletId} '.star'];
+        disp(['Reading ' starFile]);
+        origin = parse_star_file(starFile, 'origin');
+        ptsList{doubletId} = origin;
+    end
+
+    flagellaModel = flagella_model_from_pts(ptsList, doublet_list, sub_mtb_list{3}(doublet_list(1)), sortDim, smoothingLimit, pixelSize);
+    draw_flagella_model(flagellaModel, doublet_list, flagName, [graphDir '/' flagName '_model.tif'], [graphDir '/' flagName '_model_cs.tif']);
+
+    for doubletId = doublet_list
+        starFile = [starDir '/' sub_mtb_list{2}{doubletId} '.star'];
+        docInitFile = [docDir '/' initDocPrefix sub_mtb_list{1}{doubletId} '.spi'];
+        origin = parse_star_file(starFile, 'origin');
+	
+        rotang = mtb_init_rotang(origin, sub_mtb_list{3}(doubletId));
+        transform = zeros(size(origin, 1), 7);
+        transform(:, 7) = ones(size(origin, 1), 1);
+        transform(:, 1:3) = rotang;
+
+        % Get estimated psi from flagella model
+        if (doGuessPsi)
+            psimat = flagellaModel(doubletId).RotAng(3)*ones(size(origin, 1),1);
+            transform(:,3) = psimat;
+        end
+
+        write_spider_doc(transform, docInitFile);
+    end
+end
+
+exit;

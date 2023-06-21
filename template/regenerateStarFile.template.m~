@@ -1,0 +1,72 @@
+%-------------------------------------------------------------
+% TEMPLATE
+% @purpose regenerateStarFile from old star file and alignment parameters
+% @version 1.0
+% @date 20110113
+%-------------------------------------------------------------
+%%% --- START HEADER ---
+listFile = #s#ListFile#;
+pixelSize = #d#PixelSize#;
+sortDim = #d#SortDim#;
+period = #d#Period#;
+%%% --- END HEADER -----
+
+% ---- Program default ---------
+starDir = 'star';
+docDir = 'doc';
+graphDir = 'graph';
+initDocPrefix = 'doc_init_';
+alnDocPrefix = 'doc_total_';
+smoothingLimit = 13;
+exclusionLimit = .1;
+fitType = 'spline';
+% ------------------------------
+
+disp(['List File: ' listFile])
+disp(['Sort Dim: ' num2str(sortDim)])
+disp(['Pixel Size: ' num2str(pixelSize)])
+
+[mtbList, numberOfRecords] = parse_list(listFile);
+flagellaList = parse_flagella_name_from_list(mtbList);
+
+for i = 1:numel(flagellaList)
+    flagName = flagellaList{i};
+    [doubletList, subMtbList] = get_doublet_list(mtbList, numberOfRecords, flagName);
+
+    ptsList = {};
+    alnList = {};
+    for doubletId = doubletList
+        starFile = [starDir '/' subMtbList{2}{doubletId} '.star'];
+        alnDocFile = [docDir '/' alnDocPrefix subMtbList{1}{doubletId} '.spi'];
+        disp(['Reading ' starFile]);
+        disp(['Reading ' alnDocFile]);
+
+        origins = parse_star_file(starFile, 'origin');
+        transform = parse_spider_doc(alnDocFile);
+        goodOrigIndx = transform(:,7) > exclusionLimit;
+        origins = origins(goodOrigIndx, :);
+        transform = transform(goodOrigIndx, :);
+        correctedOrigins = transform_pts(origins, transform);
+        newOrigins = auto_fit_mtb(correctedOrigins, period/pixelSize, sortDim, fitType);
+        ptsList{doubletId} = correctedOrigins;
+        alnList{doubletId} = transform;
+        disp(['Rewriting ' starFile]);
+        write_star_file(starFile, round(newOrigins), starFile);
+    end
+
+    flagellaModel = flagella_model_from_pts(ptsList, doubletList, subMtbList{3}(doubletList(1)), sortDim, smoothingLimit, pixelSize);
+
+    for doubletId = doubletList
+        noParticles = size(flagellaModel(doubletId).IndRotAng, 1)
+        docInitFile = [docDir '/' initDocPrefix subMtbList{1}{doubletId} '.spi'];
+        transform = zeros(noParticles, 7);
+        transform(:, 1:2) = flagellaModel(doubletId).IndRotAng(:, 1:2);
+        transform(:, 3) = repmat(mean(angle_norm(alnList{doubletId}(floor(noParticles/2)-3: floor(noParticles/2)+3,3))), noParticles, 1);
+        disp(['Writing ' docInitFile]);
+        write_spider_doc(transform, docInitFile);
+    end
+
+    draw_flagella_model(flagellaModel, doubletList, flagName, [graphDir '/' flagName '_model.tif'], [graphDir '/' flagName '_model_cs.tif'], doOutputInfo);
+end
+
+exit;

@@ -1,0 +1,36 @@
+%-------------------------------------------------------------
+% TEMPLATE
+% @purpose Average along a certain Y section to recognize the RS for check pickIda
+% @version 1.0
+% @date 20100619
+%-------------------------------------------------------------
+%%% --- START HEADER ---
+listFile = #s#listFile#; 
+lowFreq = #d#LowPassFreq#;
+hiFreq = #d#HighPassFreq#;
+sigma = #d#Sigma#;
+startSection = #d#RsStartSection#;
+%%% --- END HEADER -----
+
+% ---- Program default ---------
+graphDir = 'graph';
+noSliceToAvg = 10;
+% ------------------------------
+
+disp(['List: ' listFile])
+
+[mtb_list, number_of_records] = parse_list(listFile);
+
+for doubletId = 1:number_of_records
+    imFile = [mtb_list{1}{doubletId} '.spi'];
+    vol = tom_spiderread2(imFile);
+    vol = vol.data;
+
+    im = sum(vol(startSection:startSection + noSliceToAvg -1,:,:), 1);
+    im = squeeze(im);
+    im = tom_bandpass(im, lowFreq*max(size(im)), hiFreq*max(size(im)), sigma);
+    im = vol2double(im);   
+    imwrite(im, [graphDir '/ShiftAln_' mtb_list{1}{doubletId} '.png']);
+end
+
+exit;

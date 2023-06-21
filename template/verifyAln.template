@@ -1,0 +1,120 @@
+%-------------------------------------------------------------
+% TEMPLATE
+% @purpose To visualize the alignment
+% @version 1.3
+% @date 20091016
+% @update 20110106 using subplot for ccc_hist & distance hist
+%-------------------------------------------------------------
+%%% --- START HEADER ---
+listFile = #s#ListFile#; 
+period = #d#Period#;
+pixelSize = #d#PixelSize#;
+%%% --- END HEADER -----
+
+% ---- Program default ---------
+starDir = 'star';
+docDir = 'doc';
+graphDir = 'graph';
+docPrefix = 'doc_total_';
+sizeOfBin = .01;
+% ------------------------------
+
+disp(['List: ' listFile])
+
+[mtbList, noRecords] = parse_list(listFile);
+flagellaList = parse_flagella_name_from_list(mtbList);
+
+if period < 96
+	isOdaPrj = 1;
+else
+	isOdaPrj = 0;
+end
+
+cccArray = [];
+distanceArray = [];
+
+for i = 1:numel(flagellaList)
+	flagName = flagellaList{i};
+   [doubletList, subMtbList] = get_doublet_list(mtbList, noRecords, flagName);
+	
+	if ~isOdaPrj		
+		flagName = regexprep(flagName, '_ida_v1$', '');
+	end
+	
+	for doubletId = doubletList
+		starFile = [subMtbList{2}{doubletId}  '.star'];
+		docFile = [docPrefix  subMtbList{1}{doubletId} '.spi'];
+	
+		disp(['Flagella: ' flagName ' -> ' num2str(doubletId)]);
+
+		transform = parse_spider_doc([docDir '/' docFile]);
+		origins = parse_star_file([starDir '/' starFile], 'origin');
+		correctedOrigins = transform_pts(origins, transform);
+	
+		cccArray = [cccArray  transform(:,7)'];
+		distance = pixelSize*[0 sqrt(sum((diff(correctedOrigins, 1, 1)).^2,2))']';
+		distanceArray = [distanceArray distance(2:end)'];
+	
+		% Ploting
+		plot(distance + period*(doubletId-1), '+r');
+		hold on
+		plot(period*ones(size(origins,1),1)  + period*(doubletId-1), 'b', 'LineWidth', 1);
+		hold on	
+		hold on	
+		text(120/period, 10 + period + period*(doubletId-1), [num2str(period) 'nm']);						
+	end
+	
+	title(['Original distance for ' strrep(flagName, '_', '\_')], 'FontWeight', 'bold', 'FontSize', 10);	
+	ylabel('Distance to the next center (Angstrom) in each doublet', 'FontWeight', 'bold', 'FontSize', 10);
+	xlabel('Particle number', 'FontWeight', 'bold', 'FontSize', 10)
+	set(gca, 'FontWeight', 'bold', 'FontSize', 10);
+	set(gca, 'YTick', [period : period : period + period*8]);
+ 	set(gca, 'YTickLabel', {'Doublet 1', 'Doublet 2', 'Doublet 3', 'Doublet 4', 'Doublet 5', 'Doublet 6', 'Doublet 7', 'Doublet 8', 'Doublet 9'});
+	set(gcf, 'Unit', 'pixels', 'PaperPositionMode', 'auto');
+	outputGraph = [graphDir '/' flagName '_' num2str(period) 'nm_aln_report.tif'];				
+	print(gcf, '-r0', outputGraph, '-dtiff');
+	hold off
+	close(gcf);      		
+end
+
+if isOdaPrj
+	outputGraph = [graphDir '/' regexprep(listFile, 'list_(.*).txt', '$1') '_' num2str(period) 'nm_ccc_dist_hist.tif' ];
+else
+	outputGraph = [graphDir '/' regexprep(listFile, 'list_(.*)_ida_v1.txt', '$1') '_' num2str(period) 'nm_ccc_dist_hist.tif' ];
+end
+
+%Histogram of cross correlation
+maxValue = max(cccArray);
+subplot(2,1, 1), hist(cccArray, round(maxValue/sizeOfBin));
+title('Histogram of CCC value of all particles to the reference');
+xlabel('CCC Value', 'FontWeight', 'bold', 'FontSize', 10)
+ylabel('Number of particles', 'FontWeight', 'bold', 'FontSize', 10)
+
+% Drawing the histogram of distance
+% Average of 50 percentile of distanceArray
+ds = sort(distanceArray);
+Q(1) = median(ds(find(ds<median(ds))));
+Q(2) = median(ds);
+Q(3) = median(ds(find(ds>median(ds))));
+
+count = 0;
+total = 0;
+for i = 1:length(ds)
+	if ds(i) > Q(1) && ds(i) < Q(3)
+		count = count + 1;
+		total = total + ds(i);
+	end
+end
+
+maxValue = max(distanceArray);
+minValue = min(distanceArray);
+
+subplot(2,1,2), hist(distanceArray, round((maxValue-minValue)/sizeOfBin));
+title('Histogram of distance of all particles to the next particle');
+xlabel(['Distance (50 percentile dist. avg ' num2str(total/count) ' nm)'], 'FontWeight', 'bold', 'FontSize', 10)
+ylabel('Number of particles', 'FontWeight', 'bold', 'FontSize', 10)
+set(gcf, 'Unit', 'pixels', 'PaperPositionMode', 'auto');
+print(gcf, '-r0', outputGraph, '-dtiff');
+close(gcf);   
+
+exit

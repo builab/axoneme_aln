@@ -1,0 +1,41 @@
+%-------------------------------------------------------------
+% TEMPLATE
+% @purpose Create 24nm picked star file from initial star file
+% @version 1.0
+% @date 20080301
+%-------------------------------------------------------------
+%%% --- START HEADER ---
+listFile = #s#ListFile#; 
+pixelSize = #d#PixelSize#;
+period = #d#Period#;
+sortDim = #d#SortDim#;
+%%% --- END HEADER -----
+
+% ---- Program default ---------
+starDir = 'star';
+starFileSuffix = '_fitted.star';
+fitType = 'line';
+% ------------------------------
+
+disp(['List File: ' listFile]);
+disp(['Sort Dim: ' num2str(sortDim)]);
+disp(['Period: ' num2str(period)]);
+disp(['Pixel Size: ' num2str(pixelSize)]);
+
+[mtbList, noRecords] = parse_list(listFile);
+
+for doubletId = 1:noRecords
+    starFile = [starDir '/' mtbList{2}{doubletId} '.star'];
+    outputStarFile = [starDir '/' mtbList{2}{doubletId} starFileSuffix];
+    disp(starFile)
+    disp(outputStarFile)
+
+    origins = parse_star_file(starFile, 'origin');
+    [sortOy, sortIndx] = sort(origins(:,sortDim), 'ascend');
+    sortedOrigins = origins(sortIndx, :);
+   
+    newOrigins = auto_fit_mtb(sortedOrigins, period/pixelSize, sortDim, fitType);
+    write_star_file(starFile, round(newOrigins), outputStarFile);
+end
+
+exit;

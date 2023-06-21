@@ -1,0 +1,96 @@
+%-------------------------------------------------------------
+% TEMPLATE
+% @purpose To visualize the classification result
+% @version 1.0 (does not work with more than 2 classes)
+% @date 20101014
+% TODO not invert properly for flaDirect 1
+%-------------------------------------------------------------
+%%% --- START HEADER ---
+listFile = #s#ListFile#; 
+number_of_classes = #d#NumberOfReferences#;
+iterationNo = #d#IterationNo#;
+sortDim=#d#SortDim#;
+pixelSize = #d#PixelSize#;
+%%% --- END HEADER -----
+
+% ---- Program default ---------
+starDir = 'star';
+docDir = 'doc';
+graphDir = 'graph';
+smoothingLimit = 13;
+pattern = {'yo', 'bo', 'r*'};
+int_points = 3000; % Number of interpolation points in fit_mtb_line function
+notDraw = 1
+% ------------------------------
+
+docPrefix = ['doc_class' sprintf('%0.2d', iterationNo) '_'];
+
+disp(['List: ' listFile])
+disp(['Input Doc. Prefix: ' docPrefix]);
+
+
+[mtb_list, number_of_records] = parse_list(listFile);
+flagellaList = parse_flagella_name_from_list(mtb_list);
+
+
+for i = 1:numel(flagellaList)
+	flagellaName = flagellaList{i};
+	disp(['Analyzing ' flagellaName])	
+	[doubletList, sub_mtb_list] = get_doublet_list(mtb_list, number_of_records, flagellaName);
+
+	model = flagella_model(sub_mtb_list, doubletList, starDir, sortDim, smoothingLimit, pixelSize, graphDir, notDraw);
+
+	maxCutPoint = 0;
+	cutPointIndx = zeros(size(doubletList, 2), 1);
+	for doubletId = doubletList
+		number_of_origins = size(model(doubletId).OrigPoints, 1);
+		cutPointIndx(doubletId) = floor(model(doubletId).CutPoint*number_of_origins/int_points);
+		flaDirect = sub_mtb_list(doubletId, 3);
+		flaDirect = flaDirect{1};
+		if  flaDirect == 1
+			cutPointIndx(doubletId) = number_of_origins - cutPointIndx(doubletId);
+		end		
+		if maxCutPoint < cutPointIndx(doubletId)
+			maxCutPoint = cutPointIndx(doubletId);
+		end
+	end
+
+
+	close all, figure
+
+	for doubletId = doubletList
+		docFile = [docDir '/' docPrefix sub_mtb_list{doubletId, 1} '.spi'];
+	
+		
+		docContent = parse_spider_doc(docFile);
+	 	particleList = [1: size(docContent, 1)];
+		
+		flaDirect = sub_mtb_list(doubletId, 3);
+		flaDirect = flaDirect{1};
+		if  flaDirect == 1
+			particleList = fliplr(particleList);
+		end
+
+		% Drawing
+		lengthInsert = maxCutPoint - cutPointIndx(doubletId);		
+		for particleId = 1:size(docContent, 1)
+			plot(particleList(particleId) + lengthInsert, doubletId, pattern{docContent(particleId, 8)+1}) 	
+			hold on
+		end
+	end
+
+	hold off
+	tit = regexprep(flagellaName, '_', '\\_');
+	title(upper(tit),'FontWeight','bold', 'FontSize', 16);
+	xlabel('Particles','FontWeight','bold', 'FontSize', 14)
+	ylabel('Doublet Number','FontWeight','bold', 'FontSize', 14)
+	axis([0 60 0 10])
+	set(gca, 'ytick', [1:9])
+	set(gca, 'xtick', [0:10:60])
+	text(2,9.5,'Proximal','FontSize', 14)
+	text(50,9.5,'Distal','FontSize', 14)
+	%set(gcf,'Position', [560 530 605 420]);
+	set(gcf, 'PaperPositionMode', 'auto')
+	disp(['Writing ' graphDir '/' docPrefix flagellaName '_plot.tif ...'])
+	print(gcf, '-r0', [graphDir '/' docPrefix flagellaName '_plot.tif'], '-dtiff');
+end

@@ -1,0 +1,55 @@
+AXONEME_ALIGN
+
+Quick Guide
+
+Startup a ODA (24nm) project
+
+You need the following thing before starting up the project.
+Directory
+	star	a directory to hold all your picked particle coordinate file
+Files:
+	flaDirect.txt	a file containing the flagella direction of all data set used.
+	ta_myproj.txt	a file contain the tilt angle of all data set used
+
+E.g.:
+Content of flaDirect.txt
+	seaurchin_01	1
+	seaurchin_02	0
+	seaurchin_03	0
+
+Content of ta_seaurchin.txt
+	seaurchin_01	[-96.0 -60.0 60.1]
+	seaurchin_02	[-96.1 -58.9 61.2]
+	seaurchin_03	[-96.0 -59.2 60.5]
+
+Startup:
+Using the AA_STARTUP.PL script, you need to provide a few parameters and the parameter file, scripts, list file will be generated automatically.
+
+>>aa_startup.pl
+Project: seaurchin
+Flagella direction file: flaDirect.txt
+Tilt angle file: ta_seaurchin.txt
+...
+...
+
+If this is the first time you start the project, AA_STARTUP will check your star file, then generate the list file and all the necessary scripts. If the list file already exists, the script will ask you to overwrite or use it.
+
+Generated files
+List file
+
+Parameter file
+All the parameters are stored in seaurchin.param file.
+
+Scripts
+All script are stored in "bat" directory. The odaScript.bat contains all the script should be run sequentially from start to end.
+
+Regenerating scripts:
+
+If for some reasons e.g. changing list file, you need to regenerate the script file, you don't need to start the project again, just call the AA_SCRIPTS.PL script
+
+>>aa_scripts.pl
+..
+..
+..
+
+You can choose to generate individual script or all of them.

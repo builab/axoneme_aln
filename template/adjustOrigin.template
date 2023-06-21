@@ -1,0 +1,58 @@
+%-------------------------------------------------------------
+% TEMPLATE
+% @purpose adjust origin from old star file and alignment parameters
+% @version 1.0
+% @date 20220804
+%-------------------------------------------------------------
+%%% --- START HEADER ---
+listFile = #s#ListFile#;
+pixelSize = #d#PixelSize#;
+sortDim = #d#SortDim#;
+%%% --- END HEADER -----
+
+% ---- Program default ---------
+starDir = 'star';
+docDir = 'doc';
+graphDir = 'graph';
+alnDocPrefix = 'doc_total_';
+% ------------------------------
+
+disp(['List File: ' listFile])
+disp(['Sort Dim: ' num2str(sortDim)])
+disp(['Pixel Size: ' num2str(pixelSize)])
+
+mkdir([starDir  '_corr'])
+mkdir([docDir '_corr'])
+
+[mtbList, numberOfRecords] = parse_list(listFile);
+flagellaList = parse_flagella_name_from_list(mtbList);
+
+for i = 1:numel(flagellaList)
+    flagName = flagellaList{i};
+    [doubletList, subMtbList] = get_doublet_list(mtbList, numberOfRecords, flagName);
+
+    ptsList = {};
+    alnList = {};
+    for doubletId = doubletList
+        starFile = [starDir '/' subMtbList{2}{doubletId} '.star'];
+        alnDocFile = [docDir '/' alnDocPrefix subMtbList{1}{doubletId} '.spi'];
+        disp(['Reading ' starFile]);
+        disp(['Reading ' alnDocFile]);
+
+        origins = parse_star_file(starFile, 'origin');
+        transform = parse_spider_doc(alnDocFile);
+        correctedOrigins = transform_pts(origins, transform);
+        ptsList{doubletId} = correctedOrigins;
+        alnList{doubletId} = transform;
+        docOutFile = [docDir '_corr/' alnDocPrefix subMtbList{1}{doubletId} '.spi'];
+        starOutFile = [starDir '_corr/' subMtbList{2}{doubletId} '.star'];
+        transform(:,4:6) = transform(:,4:6)*0;
+   	disp(['Rewriting ' starOutFile]);
+        write_star_file(starFile, round(ptsList{doubletId}), starOutFile);
+        disp(['Rewriting ' docOutFile]);
+        write_spider_doc(transform, docOutFile);
+    end
+
+end
+
+exit;

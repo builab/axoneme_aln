@@ -1,0 +1,38 @@
+%-------------------------------------------------------------
+% TEMPLATE
+% @purpose Calculate weighted averages for class average
+% @version 1.0
+% @date 20080301
+%-------------------------------------------------------------
+%%% --- START HEADER ---
+number_of_class = #d#NumberOfReferences#;
+iterationNo = #d#IterationNo#;
+avgFile = #s#AverageFile#; 
+weightFile = #s#WeightFile#;
+corrAvgFile = #s#CorrectedAverageFile#;
+%%% --- END HEADER -----
+
+% Adding up
+for classId = 1:number_of_class
+	avgClassFile = regexprep(avgFile, '\.spi', [sprintf('%0.2d', iterationNo) '_c' sprintf('%0.3d', classId) '.spi']);
+	weightClassFile = regexprep(weightFile, '\.spi', [sprintf('%0.2d', iterationNo) '_c' sprintf('%0.3d', classId) '.spi']);
+	corrClassAvgFile = regexprep(corrAvgFile, '_cr\.spi', [sprintf('%0.2d', iterationNo) '_c' sprintf('%0.3d', classId) '_cr.spi']);
+	disp(['Average: ' avgClassFile])
+	disp(['Weight: ' weightClassFile])
+	
+
+	add_avg_cmd = ['spider_avg.pl -output ' avgClassFile ' ' regexprep(avgFile, '\.spi', ['_p?' sprintf('%0.2d', iterationNo) '_c' sprintf('%0.3d', classId) '.spi'])];
+	add_weight_cmd = ['spider_avg.pl -output ' weightClassFile ' ' regexprep(weightFile, '\.spi', ['_p?' sprintf('%0.2d', iterationNo) '_c' sprintf('%0.3d', classId) '.spi'])];
+	disp(add_avg_cmd)
+	disp(add_weight_cmd)
+	system(add_avg_cmd);
+	system(add_weight_cmd);
+	disp(['Writing corrected Average: ' corrClassAvgFile])
+	calc_weighted_avg(avgClassFile, weightClassFile, corrClassAvgFile);
+end
+
+% Clean up
+rm_cmd = ['rm *_avg_p?' sprintf('%0.2d', iterationNo) '_c*spi'];
+disp(rm_cmd);
+system(rm_cmd);
+exit;

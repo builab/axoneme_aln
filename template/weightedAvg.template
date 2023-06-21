@@ -1,0 +1,18 @@
+%-------------------------------------------------------------
+% TEMPLATE
+% @purpose Calculate weighted averages
+% @version 1.0
+% @date 20080301
+%-------------------------------------------------------------
+%%% --- START HEADER ---
+avgFile = #s#AverageFile#; 
+weightFile = #s#WeightFile#;
+corrAvgFile = #s#CorrectedAverageFile#;
+%%% --- END HEADER -----
+
+disp(['Average: ' avgFile])
+disp(['Weight: ' weightFile])
+disp(['Corrected Average: ' corrAvgFile])
+
+calc_weighted_avg(avgFile, weightFile, corrAvgFile);
+exit;

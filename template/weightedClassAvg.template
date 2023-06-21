@@ -1,0 +1,26 @@
+%-------------------------------------------------------------
+% TEMPLATE
+% @purpose Calculate weighted averages for class average
+% @version 1.0
+% @date 20080301
+%-------------------------------------------------------------
+%%% --- START HEADER ---
+number_of_class = #d#NumberOfReferences#;
+iterationNo = #d#IterationNo#;
+avgFile = #s#AverageFile#; 
+weightFile = #s#WeightFile#;
+corrAvgFile = #s#CorrectedAverageFile#;
+%%% --- END HEADER -----
+
+for classId = 1:number_of_class
+	avgClassFile = regexprep(avgFile, '\.spi', [sprintf('%0.2d', iterationNo) '_c' sprintf('%0.3d', classId) '.spi']);
+	weightClassFile = regexprep(weightFile, '\.spi', ['_avg' sprintf('%0.2d', iterationNo) '_c' sprintf('%0.3d', classId) '.spi']);
+	corrClassAvgFile = regexprep(corrAvgFile, '_cr\.spi', [sprintf('%0.2d', iterationNo) '_c' sprintf('%0.3d', classId) '_cr.spi']);
+	disp(['Average: ' avgClassFile])
+	disp(['Weight: ' weightClassFile])
+	disp(['Corrected Average: ' corrClassAvgFile])
+
+	calc_weighted_avg(avgClassFile, weightClassFile, corrClassAvgFile);
+end
+
+exit;

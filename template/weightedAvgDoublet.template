@@ -1,0 +1,29 @@
+%-------------------------------------------------------------
+% TEMPLATE
+% @purpose Calculate weighted averages
+% @version 1.0
+% @date 20080301
+%-------------------------------------------------------------
+%%% --- START HEADER ---
+avgFile = #s#AverageFile#; 
+weightFile = #s#WeightFile#;
+corrAvgFile = #s#CorrectedAverageFile#;
+%%% --- END HEADER -----
+
+for i = 1:9
+	avgDoubletFile = regexprep(avgFile, '\.spi', ['_d' num2str(i) '\.spi']);
+	avgDoubletFile = regexprep(avgDoubletFile, ['_avg_d' num2str(i) '\.spi'], ['_d' num2str(i) '_avg\.spi']);
+	avgDoubletFile = regexprep(avgDoubletFile, ['_ida_v1_d' num2str(i)], ['_d' num2str(i)]);
+	weightDoubletFile = regexprep(weightFile, '\.spi', ['_d' num2str(i) '\.spi']);
+	weightDoubletFile = regexprep(weightDoubletFile, ['_avg_d' num2str(i) '\.spi'], ['_d' num2str(i) '_avg\.spi']);
+	weightDoubletFile = regexprep(weightDoubletFile, ['_ida_v1_d' num2str(i)], ['_d' num2str(i)]);
+	corrAvgDoubletFile = regexprep(corrAvgFile, '_cr\.spi', ['_d' num2str(i) '_cr\.spi']);
+	corrAvgDoubletFile = regexprep(corrAvgDoubletFile, ['_avg_d' num2str(i) '_cr\.spi'], ['_d' num2str(i) '_avg_cr\.spi']);
+	corrAvgDoubletFile = regexprep(corrAvgDoubletFile, ['_ida_v1_d' num2str(i)], ['_d' num2str(i)]);
+	disp(['Average: ' avgDoubletFile])
+	disp(['Weight: ' weightDoubletFile])
+	disp(['Corrected Average: ' corrAvgDoubletFile])
+	calc_weighted_avg(avgDoubletFile, weightDoubletFile, corrAvgDoubletFile);
+end
+
+exit;

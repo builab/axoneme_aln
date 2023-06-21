@@ -1,0 +1,131 @@
+%-------------------------------------------------------------
+% TEMPLATE
+% @purpose To visualize the alignment
+% @version 1.0
+% @date 20091016
+%-------------------------------------------------------------
+%%% --- START HEADER ---
+listFile = #s#ListFile#; 
+period = #d#Period#;
+pixelSize = #d#PixelSize#;
+%%% --- END HEADER -----
+
+% ---- Program default ---------
+starDir = 'star';
+docDir = 'doc';
+graphDir = 'graph';
+docPrefix = 'doc_total_';
+sizeOfBin = .01;
+% ------------------------------
+
+disp(['List: ' listFile])
+
+[mtb_list, number_of_records] = parse_list(listFile);
+
+if isempty(strfind(mtb_list{1}{1}, 'ida_v1'))
+	isOdaPrj = 1;
+else
+	isOdaPrj = 0;
+end
+
+ccc_array = [];
+distance_array = [];
+
+for doubletId = 1:number_of_records
+	if isOdaPrj
+		flagName = regexprep(mtb_list{1}{doubletId}, '_00\d$', '');
+	else
+		flagName = regexprep(mtb_list{1}{doubletId}, '_ida_v1_00\d$', '');
+	end
+	
+	starFile = [mtb_list{2}{doubletId}  '.star'];
+	docFile = [docPrefix  mtb_list{1}{doubletId} '.spi'];
+	
+	doubletNo = regexprep(mtb_list{1}{doubletId}, '.*(\d)$', '$1');
+	doubletNo = str2double(doubletNo);
+	
+	disp(['Flagella: ' flagName ' -> ' num2str(doubletNo)]);
+
+	transform = parse_spider_doc([docDir '/' docFile]);
+	origin = parse_star_file([starDir '/' starFile], 'origin');
+	origin_corr = transform_pts(origin, transform);
+	
+	ccc_array = [ccc_array  transform(:,7)'];
+
+	distance = pixelSize*[0 sqrt(sum((diff(origin_corr, 1, 1)).^2,2))']';
+	
+	distance_array = [distance_array distance(2:end)'];
+	
+	% Ploting	
+	plot(distance + period*(doubletNo-1), '+r');
+	hold on
+	plot(period*ones(size(origin,1),1)  + period*(doubletNo-1), 'b', 'LineWidth', 1);
+	hold on	
+	text(120/period, 10 + period + period*(doubletNo-1), [num2str(period) 'nm']);
+	
+	% Draw at the end of doublet
+	if (doubletId==number_of_records) || (isempty(strfind(mtb_list{2}{doubletId+1}, flagName)))
+		title(['Original distance for ' strrep(flagName, '_', '\_')], 'FontWeight', 'bold', 'FontSize', 10);	
+		ylabel('Distance to the next center (Angstrom) in each doublet', 'FontWeight', 'bold', 'FontSize', 10);
+		xlabel('Particle number', 'FontWeight', 'bold', 'FontSize', 10)
+		set(gca, 'FontWeight', 'bold', 'FontSize', 10);
+		set(gca, 'YTick', [period : period : period + period*8]);
+	 	set(gca, 'YTickLabel', {'Doublet 1', 'Doublet 2', 'Doublet 3', 'Doublet 4', 'Doublet 5', 'Doublet 6', 'Doublet 7', 'Doublet 8', 'Doublet 9'});
+		set(gcf, 'Unit', 'pixels', 'PaperPositionMode', 'auto');
+		outputGraph = [graphDir '/' flagName '_' num2str(period) 'nm_aln_report.tif'];				
+		print(gcf, '-r0', outputGraph, '-dtiff');
+		close(gcf);      		
+	end
+end
+
+%Draw histogram of cross correlation
+maxValue = max(ccc_array);
+hist(ccc_array, round(maxValue/sizeOfBin));
+title('Histogram of CCC value of all particles to the reference');
+xlabel('CCC Value', 'FontWeight', 'bold', 'FontSize', 10)
+ylabel('Number of particles', 'FontWeight', 'bold', 'FontSize', 10)
+set(gcf, 'Unit', 'pixels', 'PaperPositionMode', 'auto');
+
+if isOdaPrj
+	outputGraph = [graphDir '/' regexprep(listFile, 'list_(.*).txt', '$1') '_' num2str(period) 'nm_ccc_hist.tif' ];
+else
+	outputGraph = [graphDir '/' regexprep(listFile, 'list_(.*)_ida_v1.txt', '$1') '_' num2str(period) 'nm_ccc_hist.tif' ];
+end
+
+print(gcf, '-r0', outputGraph, '-dtiff');
+close(gcf);   
+
+% Drawing the histogram of distance
+% Average of 50 percentile of distance_array
+ds = sort(distance_array);
+Q(1) = median(ds(find(ds<median(ds))));
+Q(2) = median(ds);
+Q(3) = median(ds(find(ds>median(ds))));
+
+count = 0;
+total = 0;
+for i = 1:length(ds)
+	if ds(i) > Q(1) && ds(i) < Q(3)
+		count = count + 1;
+		total = total + ds(i);
+	end
+end
+
+maxValue = max(distance_array);
+minValue = min(distance_array);
+hist(distance_array, round((maxValue-minValue)/sizeOfBin));
+title('Histogram of distance of all particles to the next particle');
+xlabel(['Distance (50 percentile dist. avg ' num2str(total/count) ' pxl)'], 'FontWeight', 'bold', 'FontSize', 10)
+ylabel('Number of particles', 'FontWeight', 'bold', 'FontSize', 10)
+set(gcf, 'Unit', 'pixels', 'PaperPositionMode', 'auto');
+
+if isOdaPrj
+	outputGraph = [graphDir '/' regexprep(listFile, 'list_(.*).txt', '$1') '_' num2str(period) 'nm_dist_hist.tif' ];
+else
+	outputGraph = [graphDir '/' regexprep(listFile, 'list_(.*)_ida_v1.txt', '$1') '_' num2str(period) 'nm_dist_hist.tif' ];
+end
+
+print(gcf, '-r0', outputGraph, '-dtiff');
+close(gcf);   
+
+exit

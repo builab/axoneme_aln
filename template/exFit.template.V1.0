@@ -1,0 +1,65 @@
+% -------------------------------------------------
+% TEMPLATE
+% @purpose: Fit star file for RS from aligned IDA
+% @version 1.0
+% Require geom3d 
+% HB 20080722
+% -------------------------------------------------
+
+%%% --- START HEADER ---
+listFile = #s#ListFile#;
+extensionName = #s#ExtensionName#;
+shiftX= #d#OriginShiftX#;
+shiftY= #d#OriginShiftY#;
+shiftZ= #d#OriginShiftZ#;
+%%% --- END HEADER -----
+
+outputListFile = regexprep(listFile, 'ida_v1', extensionName);
+
+%-- Program default -------
+starDir = 'star';
+docDir =  'doc';
+docInputPrefix = 'doc_total_';
+initRsDocPrefix = 'doc_init_';
+%--------------------------
+
+originShift=[shiftX shiftY shiftZ];
+[mtb_list, number_of_records] = parse_list(listFile);
+
+fid = fopen(outputListFile, 'wt');
+
+for doubletId = 1:number_of_records
+	outputStarPrefix = regexprep(mtb_list{2}{doubletId}, '_ida_v1_', ['_' extensionName '_']);
+	outputDocPrefix = regexprep(mtb_list{1}{doubletId}, '_ida_v1_(\d+)$', ['_' extensionName '_$1']);
+	fprintf(fid, '%20s %20s %3d\n', outputDocPrefix, outputStarPrefix, mtb_list{3}(doubletId));
+	docInputFile = [docDir '/' docInputPrefix mtb_list{1}{doubletId} '.spi'];
+	starFile = [starDir '/' mtb_list{2}{doubletId} '.star'];
+	outputDocFile = [docDir '/' initRsDocPrefix outputDocPrefix '.spi'];
+	outputStarFile = [starDir '/' outputStarPrefix '.star'];
+	disp(['Reading: ' docInputFile]);
+	disp(['Reading: ' starFile]);
+	docInputContent = parse_spider_doc(docInputFile);
+	starInputContent = parse_star_file(starFile, 'origin');
+
+	transform = docInputContent;
+	origin = starInputContent;
+
+	xformOrigin = transform_pts(origin, transform);
+
+	newOrigin = zeros(size(xformOrigin));
+	for pointId = 1:size(xformOrigin,1)
+		xformMat = rotationOz(transform(pointId,3)*pi/180)*rotationOy(transform(pointId,2)*pi/180)*rotationOz(transform(pointId,1)*pi/180);			
+		xformPts = transformPoint3d(xformOrigin(pointId,:), xformMat);
+		xformNewOrigin = xformPts + originShift;
+		newOrigin(pointId, :) = transformPoint3d(xformNewOrigin, inv(xformMat));
+	end
+
+	transform(:,4:6) = zeros(size(transform, 1), 3);
+	disp(['Writing: ' outputStarFile]);
+	write_star_file(starFile, round(newOrigin), outputStarFile);		
+	disp(['Writing: ' outputDocFile]);
+	write_spider_doc(transform, outputDocFile);
+end
+
+fclose(fid);
+exit;

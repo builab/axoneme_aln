@@ -1,0 +1,159 @@
+%%--------------------------------------------------------
+% @template plotRsOrganization.template
+% @purspose plot Radial spoke Organization around the central pair for a list of flagella
+% @date: 2011/01/06
+% @version 1.1
+% @update 20110106 add output text file about doublet shift
+%                  add a threshold limit for round-shape based on elliptical distortion
+% TODO iterative look for region with lower elliptical distortion
+% TODO get upper and lower from keyboard input
+%%--------------------------------------------------------
+%%% --- START HEADER ---
+listFile = #s#ListFile#;
+pixelSize = #d#PixelSize#;
+period = #d#Period#;
+sortDim = #d#SortDim#;
+exclusionLimit = #d#IdaExclusionLimit#;
+%%% --- END HEADER -----
+
+% Program default ------
+docPrefix = 'doc_total_';
+docDir = 'doc';
+starDir = 'star';
+graphDir = 'graph';
+smoothingLimit = 13;
+distortionThreshold = 1.13;
+% ------------------------------
+
+upperY = 1200; % Only use particle in this region, better to choose the region with round shape
+lowerY = 800; % 
+
+disp(['List: ' listFile])
+
+[mtbList, noRecords] = parse_list(listFile);
+flagellaList = parse_flagella_name_from_list(mtbList);
+
+% output file
+outputTextFile = [graphDir '/' regexprep(listFile,'list_(.*).txt', '$1')  '_rs_organization_data.txt'];
+outputFile = [regexprep(listFile,'list_(.*).txt', '$1')  '_rs_organization.tif'];
+
+close all
+figure
+
+totalZcumm = [];
+totalZdiff = [];
+listFlag = [];
+listDistort = [];
+
+for i = 1:numel(flagellaList)
+	flagName = flagellaList{i};
+	zarray = [];
+	[doubletList, subMtbList] = get_doublet_list(mtbList, noRecords, flagName);
+	ptsList = {};
+	for doubletId = 1:9
+		docInputFile = [docDir '/' docPrefix flagName '_' sprintf('%0.3d', doubletId) '.spi'];
+		starFile = [starDir '/' flagName '_' num2str(doubletId) '.star'];
+		disp(['Reading ' docInputFile]);
+		disp(['Reading ' starFile]);
+	
+		docInputContent = parse_spider_doc(docInputFile);
+		origins = parse_star_file(starFile, 'origin');
+		%ptsList{doubletId} = transform_pts(origins, docInputContent);
+		
+		% Find point id
+		[minValue, pointId] = min(abs(origins(:, 2) - (upperY+lowerY)/2));
+		point = origins(pointId, :);
+		xform = docInputContent(pointId,:);
+		shift = xform(4:6);
+		rot = xform(1:3);
+		mat3 = matrix3_from_euler(rot);	
+		origins_xform = (mat3*point' + shift')';
+   		zarray = [zarray; origins_xform(3)];
+
+		% Construct model from oda
+		docInputOdaFile = [docDir '/' docPrefix regexprep(flagName, '_ida_v1$', '_') sprintf('%0.3d', doubletId) '.spi']; 
+		starOdaFile = [starDir '/' regexprep(flagName, '_ida_v1$', '_') num2str(doubletId) '.star'];
+		disp(['Reading ' docInputOdaFile]);
+		disp(['Reading ' starOdaFile]);
+	
+		docInputOdaContent = parse_spider_doc(docInputOdaFile);
+		originsOda = parse_star_file(starOdaFile, 'origin');
+		ptsList{doubletId} = transform_pts(originsOda, docInputOdaContent);
+	end
+	
+	% Analyze shape of flagella
+	flagellaModel = flagella_model_from_pts(ptsList, doubletList, subMtbList{3}(doubletList(1)), sortDim, smoothingLimit, pixelSize);
+	elli = fit_ellipse_flagella_model(flagellaModel, doubletList, lowerY, upperY);
+	ellipDistortion = elli.b/elli.a;
+	disp(['--> Distortion ratio of ' flagName ' is ' num2str(ellipDistortion)]);
+
+	if ellipDistortion < distortionThreshold
+		listFlag = [listFlag; i];
+		listDistort = [listDistort; ellipDistortion];
+		zdiff = [0; diff(zarray)]*pixelSize;
+		zdiff = mod(zdiff, ones(9, 1)*period); % Convert to all positive
+		totalZdiff = [totalZdiff; zdiff'];
+		zcumm = cumsum(zdiff); % Convert to cummulative sum to draw
+		totalZcumm = [totalZcumm; zcumm'];
+		subplot(2,2,3), plot([1:9]', zcumm, '+b')
+		hold on
+	end
+end
+
+axis([0 9.5 0 600])
+set(gca, 'XTick', [1:1:9]);
+set(gca, 'XTickLabel', ['1'; '2' ; '3'; '4'; '5'; '6'; '7'; '8' ; '9']);
+title(['Cummulative shift (' num2str(numel(flagellaList)) ' flagella)'])
+xlabel('Doublet number')
+ylabel('Distance')
+hold off
+
+fid = fopen(outputTextFile, 'wt');
+fprintf(fid', '%% Consecutive shift distance along flagellum axis between consecutive doublet\n');
+fprintf(fid, '%%%20s %10s %8s %8s %8s %8s %8s %8s %8s %8s %8s\n', 'Flagella', 'Distortion', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9');
+
+% draw Z diff
+for i = 1:length(listFlag)
+	subplot(2,2,1), plot([1:9]', totalZdiff(i,:), '+r');
+	hold on
+	% Write text
+	fprintf(fid, '%21s %10.2f', regexprep(flagellaList{listFlag(i)}, '_ida_v1$', ''), listDistort(i));
+	fprintf(fid, '%8.1f %8.1f %8.1f %8.1f %8.1f %8.1f %8.1f %8.1f %8.1f\n', totalZdiff(i, :));
+end
+
+
+set(gca, 'XTick', [1:1:9]);
+set(gca, 'XTickLabel', ['1'; '2' ; '3'; '4'; '5'; '6'; '7'; '8' ; '9']);
+axis([0 9.5 0 600])
+title(['Shift between consecutive doublets (' num2str(numel(flagellaList)) ' flagella)'])
+xlabel('Doublet number')
+ylabel('Distance')
+hold off
+
+
+% Cummulative graph with standard error
+subplot(2,2,4), errorbar([1:9], mean(totalZcumm, 1), std(totalZcumm, 1)/sqrt(size(totalZcumm, 1)), 'b-')
+title('Averaged cummulative shift')
+xlabel('Doublet number');
+ylabel('Distance');
+axis([0 9.5 0 600])
+set(gca, 'XTick', [1:1:9]);
+set(gca, 'XTickLabel', ['1'; '2' ; '3'; '4'; '5'; '6'; '7'; '8' ; '9']);
+
+
+% Non-cummulative graph
+subplot(2,2,2), errorbar([1:9], mean(totalZdiff, 1), std(totalZdiff, 1)/sqrt(size(totalZdiff, 1)), 'r-')
+title('Averaged shift between consecutive doublets')
+xlabel('Doublet number');
+ylabel('Distance');
+axis([0 9.5 0 600])
+set(gca, 'XTick', [1:1:9]);
+set(gca, 'XTickLabel', ['1'; '2' ; '3'; '4'; '5'; '6'; '7'; '8' ; '9']);
+
+
+% Consecutive distance with standard error
+set(gcf, 'PaperPositionMode', 'auto');
+print(gcf, '-r0', [graphDir '/' outputFile], '-dtiff');
+
+
+

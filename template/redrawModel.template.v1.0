@@ -1,0 +1,54 @@
+%-------------------------------------------------------------
+% TEMPLATE
+% @purpose redrawModel from generated alignment parameters
+% @version 1.0
+% @date 20101101
+%-------------------------------------------------------------
+%%% --- START HEADER ---
+listFile = #s#ListFile#; 
+pixelSize = #d#PixelSize#;
+sortDim = #d#SortDim#;
+%%% --- END HEADER -----
+
+% ---- Program default ---------
+starDir = 'star';
+docDir = 'doc';
+graphDir = 'graph';
+initDocPrefix = 'doc_total_';
+smoothingLimit = 13;
+exclusionLimit = .1;
+% ------------------------------
+
+disp(['List File: ' listFile])
+disp(['Sort Dim: ' num2str(sortDim)])
+disp(['Pixel Size: ' num2str(pixelSize)])
+
+
+[mtb_list, number_of_records] = parse_list(listFile);
+flagellaList = parse_flagella_name_from_list(mtb_list);
+
+for i = 1:numel(flagellaList)
+    flagName = flagellaList{i};
+    [doublet_list, sub_mtb_list] = get_doublet_list(mtb_list, number_of_records, flagName);
+
+    ptsList = {};
+    for doubletId = doublet_list
+        starFile = [starDir '/' sub_mtb_list{2}{doubletId} '.star'];
+        docInitFile = [docDir '/' initDocPrefix sub_mtb_list{1}{doubletId} '.spi'];
+        disp(['Reading ' starFile]);
+        disp(['Reading ' docInitFile]);
+
+        origin = parse_star_file(starFile, 'origin');
+        transform = parse_spider_doc(docInitFile);
+        good_origin_indx = transform(:,7) > exclusionLimit;
+        origin = origin(good_origin_indx, :);
+        transform = transform(good_origin_indx, :);
+        origin_corrected = transform_pts(origin, transform);
+        ptsList{doubletId} = origin_corrected;
+    end
+    
+    flagellaModel = flagella_model_from_pts(ptsList, doublet_list, sortDim, smoothingLimit, pixelSize);
+    draw_flagella_model(flagellaModel, doublet_list, flagName, [graphDir '/' flagName '_model.tif'], [graphDir '/' flagName '_model_cs.tif']);
+end
+
+exit;

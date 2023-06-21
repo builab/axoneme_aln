@@ -1,0 +1,131 @@
+%-------------------------------------------------------------
+% TEMPLATE
+% @purpose To visualize the classification result
+% @version 1.3 (work up to 8 classes)
+% @date 20101014
+% @update 20110313 give option for plotting without alignment
+%-------------------------------------------------------------
+%%% --- START HEADER ---
+listFile = #s#ListFile#; 
+noClasses = #d#NumberOfReferences#;
+iterationNo = #d#IterationNo#;
+sortDim=#d#SortDim#;
+pixelSize = #d#PixelSize#;
+doPlotAln = #d#PlotClassificationResultsAln#;
+%%% --- END HEADER -----
+
+% ---- Program default ---------
+starDir = 'star';
+docDir = 'doc';
+graphDir = 'graph';
+smoothingLimit = 13;
+exclusionLimit = 0.1;
+pattern = {'go', 'bo', 'r*', 'md', 'kx','k+', 'kd', 'ro', 'b*'};
+interpPoints = 3000; % Number of interpolation points in fit_mtb_line function
+notDraw = 1;
+% ------------------------------
+
+docPrefix = ['doc_class_iter' sprintf('%0.2d', iterationNo) '_ref' num2str(noClasses) '_'];
+
+disp(['List: ' listFile])
+disp(['Input Doc. Prefix: ' docPrefix]);
+
+[mtbList, noRecords] = parse_list(listFile);
+flagellaList = parse_flagella_name_from_list(mtbList);
+
+
+for i = 1:numel(flagellaList)
+	flagellaName = flagellaList{i};
+	disp(['Analyzing ' flagellaName])	
+	[doubletList, subMtbList] = get_doublet_list(mtbList, noRecords, flagellaName);
+	
+	if (doPlotAln == 1)
+		ptsList = {};
+   		for doubletId = doubletList
+        		starFile = [starDir '/' subMtbList{2}{doubletId} '.star'];
+        		docFile = [docDir '/' docPrefix subMtbList{1}{doubletId} '.spi'];
+        		disp(['Reading ' starFile]);
+        		disp(['Reading ' docFile]);
+
+        		origins = parse_star_file(starFile, 'origin');
+        		transform = parse_spider_doc(docFile);
+        		goodOrigIndx = transform(:,7) > exclusionLimit;
+        		origins = origins(goodOrigIndx, :);
+        		transform = transform(goodOrigIndx, :);
+        		correctedOrigins = transform_pts(origins, transform);
+        		ptsList{doubletId} = correctedOrigins;
+   		end
+
+		model = flagella_model_from_pts(ptsList, doubletList, subMtbList{3}(doubletList(1)), sortDim, smoothingLimit, pixelSize);
+	
+		maxCutPoint = 0;
+		cutPointIndx = zeros(size(doubletList, 2), 1);
+		for doubletId = doubletList
+			noOrigins = size(model(doubletId).OrigPoints, 1);
+			cutPointIndx(doubletId) = floor(model(doubletId).CutPoint*noOrigins/interpPoints);
+			flaDirect = subMtbList{3}(doubletId);
+			if  flaDirect == 1
+				cutPointIndx(doubletId) = noOrigins - cutPointIndx(doubletId);
+			end		
+			if maxCutPoint < cutPointIndx(doubletId)
+				maxCutPoint = cutPointIndx(doubletId);
+			end
+		end
+	end
+
+	close all, figure
+
+	% plot dummy for legend
+	classLegend = cell(noClasses + 1, 1);
+	
+	for classId = 1:noClasses+1
+		classLegend{classId} = ['Class ' num2str(classId - 1)];
+		plot(-1,-1,pattern{classId});
+		hold on
+	end
+	classLegend{1} = 'No class';
+	
+	legend(classLegend, 'Location', 'NorthEastOutside');
+	
+	for doubletId = doubletList
+		docFile = [docDir '/' docPrefix subMtbList{1}{doubletId} '.spi'];
+		docContent = parse_spider_doc(docFile);
+	 	particleList = [1: size(docContent, 1)];
+		
+		flaDirect = subMtbList{3}(doubletId);
+		if  flaDirect == 1
+			particleList = fliplr(particleList);
+		end
+
+		% Drawing
+		if doPlotAln == 1
+			lengthInsert = maxCutPoint - cutPointIndx(doubletId);
+		else
+			lengthInsert = 0;
+		end
+
+		for particleId = 1:size(docContent, 1)
+			plot(particleList(particleId) + lengthInsert, doubletId, pattern{docContent(particleId, 8)+1}) 	
+			hold on
+		end
+	end
+
+	hold off
+	tit = regexprep(flagellaName, '_', '\\_');
+	title(upper(tit),'FontWeight','bold', 'FontSize', 16);
+	xlabel('Particles','FontWeight','bold', 'FontSize', 14)
+	ylabel('Doublet Number','FontWeight','bold', 'FontSize', 14)
+	axis([0 60 0 10])
+	set(gca, 'ytick', [1:9])
+	set(gca, 'xtick', [0:10:60])
+	text(2,9.5,'Proximal','FontSize', 14)
+	text(50,9.5,'Distal','FontSize', 14)
+	%set(gcf,'Position', [560 530 605 420]);
+	set(gcf, 'PaperPositionMode', 'auto')
+	disp(['Writing ' graphDir '/Classification_Iter' num2str(iterationNo) '_Ref' num2str(noClasses) '_' flagellaName '.tif ...'])
+	print(gcf, '-r0', [graphDir '/Classification_Iter' num2str(iterationNo) '_Ref' num2str(noClasses) '_' flagellaName '.tif'], '-dtiff');
+	
+
+end
+
+

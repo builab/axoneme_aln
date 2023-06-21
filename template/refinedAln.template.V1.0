@@ -1,0 +1,109 @@
+%-------------------------------------------------------------
+% TEMPLATE
+% @purpose Refine the rough alignment by Constrained Rapid Motif Search without corner info
+% @version 1.0
+% @date 20090511
+%-------------------------------------------------------------
+%%% --- START HEADER ---
+listFile = #s#ListFile#;
+taFile = #s#TiltAngleFile#; 
+refFile = #s#Reference#;
+maskFile = #s#Mask#;
+lowFreq = #d#RefLowPassFreq#;
+hiFreq = #d#RefHighPassFreq#;
+sigma = #d#Sigma#;
+phiStart = #d#PhiStart#;
+phiEnd = #d#PhiEnd#;
+phiIncr = #d#PhiIncrement#;
+thetaStart = #d#ThetaStart#;
+thetaEnd = #d#ThetaEnd#;
+thetaIncr = #d#ThetaIncrement#;
+psiStart = #d#PsiStart#;
+psiEnd = #d#PsiEnd#;
+psiIncr = #d#PsiIncrement#;
+binningFactor = #d#BinningFactor#;
+%%% --- END HEADER -----
+
+
+
+% ---- Program default ---------
+docDir = 'doc';
+graphDir = 'graph';
+initDocPrefix = 'doc_init_';
+inplaneDocPrefix = 'doc_rough_';
+refinedDocPrefix = 'doc_refined_';
+% ------------------------------
+
+angular_range = [phiStart phiEnd phiIncr; thetaStart thetaEnd thetaIncr; psiStart psiEnd psiIncr];
+
+disp(['List: ' listFile])
+disp(['Ref: ' refFile])
+disp(['Mask: ' maskFile])
+disp(['Tilt Angle File: ' taFile])
+
+[mtb_list, number_of_records] = parse_list(listFile);
+taContent = parse_ta_list(taFile);
+ref = tom_spiderread2(refFile);
+ref = -ref.data; % invert contrast
+ref = ref - mean(mean(mean(ref)));
+ref = tom_bandpass(ref, 0, hiFreq*max(size(ref)), sigma); % set low = 0
+ref_bin = tom_bin(ref, binningFactor-1);
+
+mask = tom_spiderread2(maskFile);
+mask = tom_bin(mask.data, binningFactor-1);
+
+origin = floor(size(ref)/2) + 1;
+
+for doubletId = 1:number_of_records
+    docInitContent = parse_spider_doc(strcat(docDir,'/', initDocPrefix, mtb_list{1}{doubletId}, '.spi'));
+    euler01 = docInitContent(floor((1+size(docInitContent,1))/2), 1:3);
+    docInplaneContent = parse_spider_doc(strcat(docDir,'/', inplaneDocPrefix, mtb_list{1}{doubletId}, '.spi'));
+    euler02 = docInplaneContent(1,1:3);
+    mat01 = matrix3_from_euler(euler01);
+    mat02 = matrix3_from_euler(euler02);
+    mat = mat02*mat01;
+    euler = euler_from_matrix3(mat);
+    
+    initFile = regexprep(mtb_list{1}{doubletId},  '(_\d+)$', '_rough$1');
+    origFile = [initFile '.spi'];
+    
+    outputDoc = [docDir '/' refinedDocPrefix mtb_list{1}{doubletId} '.spi'];
+    
+    for j = 1:size(taContent,1)
+        if ~isempty(strfind(mtb_list{2}{doubletId}, taContent{j,1}))
+            tilt_info  = taContent{j,2};
+            break;
+        end
+    end
+
+    targetFile = [initFile '.spi'];
+    disp(['Refining ' targetFile])
+    target = tom_spiderread2(targetFile);
+
+    % Invert contrast
+    target = -target.data;
+    target = target - min(min(min(target)));
+	 target = tom_bandpass(target, 0, hiFreq*max(size(target)), sigma);
+    target_bin = tom_bin(target, binningFactor-1);
+
+    peak_list = cramos_mask_new(ref_bin, target_bin, mask, angular_range, tilt_info, euler); 
+    [peak_sort, peak_indx] = sort(peak_list(:,7),'descend');
+    max_peak = peak_list(peak_indx(1),:);
+    
+	
+
+   max_peak(4:6) = max_peak(4:6)*binningFactor; % Because of binning, tranlation is double
+	target_rt = tom_rotate(target, [max_peak(1) max_peak(3) max_peak(2)]);
+	target_aln = tom_shift(target_rt, [max_peak(5) max_peak(4) max_peak(6)]);
+
+	ccc = tom_corr(target_aln, ref, 'xcf');
+	[c3d, val3d] = tom_peak2(ccc, [origin(1)-binningFactor-1 origin(1)+binningFactor+1 origin(2)-binningFactor-1 origin(2)+binningFactor+1 origin(3)-binningFactor-1 origin(3)+binningFactor+1]);
+   c3d = c3d - origin;
+
+	max_peak(4:6) = max_peak(4:6) + [c3d(2) c3d(1) c3d(3)];
+	disp(origFile)
+   disp(max_peak)
+   write_spider_doc(max_peak, outputDoc);
+end
+
+exit;

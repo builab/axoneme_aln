@@ -1,0 +1,60 @@
+%-------------------------------------------------------------
+% TEMPLATE
+% @purpose Calculate weight factor
+% @version 1.0
+% @date 20080301
+% @new a new lower limit which prevents particles having CCC less than
+%       a lower limit to be averaged.
+%-------------------------------------------------------------
+%%% --- START HEADER ---
+volSize = [2 2 2]*#d#ExtractedParticleRadius#;
+listFile =  #s#ListFile#;
+taFile = #s#TiltAngleFile#;
+weightFile = #s#WeightFile#;
+lowerLimit = #d#LowerLimit#;
+%%% --- END HEADER -----
+
+% --- Program default -----
+docInputPrefix = 'doc_total_';
+docDir = 'doc';
+%--------------------------
+
+disp(['Vol Size: ' num2str(volSize)])
+disp(['List File: ' listFile])
+disp(['Tilt Angle: ' taFile])
+disp(['Weight File: ' weightFile])
+disp(['Lower Limit: ' num2str(lowerLimit)]);
+
+[mtbList, noRecords] = parse_list(listFile);
+
+taContent = parse_ta_list(taFile);
+
+alnContent = [];
+taListContent = [];
+
+for doubletId = 1:noRecords
+    docInputFile = [docDir '/' docInputPrefix mtbList{1}{doubletId} '.spi'];
+    disp(['Reading ' docInputFile]);
+    docInputContent = parse_spider_doc(docInputFile);
+
+	if (doubletId > 1) 
+		alnContent = [alnContent ; docInputContent(:,[1:3 7])];
+	else
+		alnContent = docInputContent(:,[1:3 7]);
+	end
+    
+    for j = 1:size(taContent,1)
+        if ~isempty(strfind(mtbList{2}{doubletId}, taContent{j,1}))
+            tiltInfo  = taContent{j,2};
+            break;
+        end
+    end
+    
+    taListContent = [taListContent; repmat(tiltInfo, size(docInputContent,1), 1)];
+
+end
+
+weight = calc_weight_factor(volSize, alnContent, taListContent, lowerLimit);
+tom_spiderwrite2(weightFile, weight);
+
+exit;

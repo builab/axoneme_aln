@@ -1,0 +1,251 @@
+%%----------------------------------------------------------------------------
+% Script: multiref_classification.m
+% Purpose: Script to do multireference classification
+% Author: Huy Bui
+% Date: 20100617
+% @version 1.6 incorporate align + classification + corr star file
+%%----------------------------------------------------------------------------
+
+%%% --- START HEADER ---
+listFile =  #s#ListFile#;
+taFile =  #s#TiltAngleFile#;
+noReferences = #d#NumberOfReferences#;
+lowerLimit = #d#LowerLimit#; % Only add particle with CCC > this value
+extractRadius = #d#ExtractedParticleRadius#;
+iterationNo = #d#IterationNo#;
+origAvgFile = #s#AverageFile#;
+
+%%% --- END HEADER -----
+
+% --- Program default --
+maxXYshift = 2;
+maxZshift = 6;
+classLowerLimit = 0.15;
+starDir = 'star';
+docDir =  'doc';
+inputDocPrefix = 'doc_total_'; % Normally it's fixed
+bndpass =  [1 12 6]; % Normally fixed
+outputLogFile = 'multiref.log';
+tiltAxisAngle = -90;
+% --- Program default --
+
+outputDocPrefix = ['doc_class_iter' sprintf('%0.2d', iterationNo) '_ref' num2str(noReferences) '_'];
+
+disp(['List: ' listFile])
+disp(['Tilt Angle List: ' taFile]);
+disp(['Input Doc. Prefix: ' inputDocPrefix]);
+disp(['Output Doc. Prefix: ' outputDocPrefix]);
+
+refFiles = {};
+maskFiles = {};
+for classId = 1:noReferences
+	refFiles{classId} = ['ref_' sprintf('%0.3d', classId) '.spi'];
+	maskFiles{classId} = ['mask_' sprintf('%0.3d', classId) '.spi'];
+end
+
+vol_size = [extractRadius*2 extractRadius*2 extractRadius*2];
+
+disp('Ref: ')
+for classId = 1:noReferences
+	disp([' -> ' refFiles{classId}]);
+end
+
+disp('Mask: ')
+for classId = 1:noReferences
+	disp([' -> ' maskFiles{classId}]);
+end
+
+[mtbList, noRecords] = parse_list(listFile);
+taContent = parse_ta_list(taFile);
+
+box = [extractRadius - maxXYshift extractRadius + maxXYshift ...
+	extractRadius - maxXYshift extractRadius + maxXYshift ...
+	extractRadius - maxZshift extractRadius + maxZshift];
+
+% Read reference
+cRef = cell(numel(refFiles));
+for i = 1:noReferences
+	ref = tom_spiderread2(refFiles{i});
+	cRef{i} = fftn(ref.data); % Saving time
+end
+
+% Read mask
+cMask = cell(numel(maskFiles));
+for i = 1:noReferences
+	mask = tom_spiderread2(maskFiles{i});
+	cMask{i} = mask.data;
+end
+
+% Create blank class output
+cOutput = cell(numel(refFiles));
+for i = 1:noReferences
+	cOutput{i} = zeros(size(cMask{i}));
+end
+
+% Create blank weight output
+cWeight = cell(numel(refFiles));
+for i = 1:noReferences
+	cWeight{i} = zeros(size(cMask{i}));
+end
+
+% Write Logfile
+currDir = pwd;
+
+fid = fopen(outputLogFile, 'at');
+fprintf(fid, '---------------------\nClassification iteration %d at %s\n', iterationNo, datestr(now));
+fprintf(fid, '%15s', 'DoubletId');
+for classId = 0:noReferences
+	fprintf(fid, '%10s', ['Class ' num2str(classId)]);
+end
+fprintf(fid, '\n');
+
+% Making a random temporary dir
+rand('twister', sum(100*clock));
+tmpDir = ['tmp_dir' num2str(rand(1,1))];
+mkdir(tmpDir);
+cd(tmpDir)
+
+% Stats of classification
+classStat = zeros(1, noReferences+1);
+
+for doubletId = 1:noRecords
+	% Initialize
+	cParticle = cell(numel(refFiles));
+	for classId = 1:noReferences
+		cParticle{classId} = zeros(vol_size);
+	end
+	
+	starFile = ['../' starDir '/' mtbList{2}{doubletId} '.star'];
+	docInputFile = ['../' docDir '/' inputDocPrefix mtbList{1}{doubletId} '.spi'];
+	docOutputFile = ['../' docDir '/' outputDocPrefix mtbList{1}{doubletId} '.spi'];
+	corrStarFile = [mtbList{2}{doubletId} '_corr.star'];
+
+	disp(starFile)	
+	disp(docInputFile)
+	disp(docOutputFile)
+
+	% TODO corrected star file
+	star = parse_star_file(starFile);		
+ 	docInputContent = parse_spider_doc(docInputFile);
+	write_star_file(star, corrStarFile);	
+
+	noParticles = size(docInputContent, 1);
+
+	% Picking
+	pickCmd = ['bpick -extract ' num2str(extractRadius) ' -extension spi -base raw_ -background -normalize ' corrStarFile];
+	disp(pickCmd)
+	system(pickCmd);
+	
+	% Xform
+	tfmCmd = ['tfm_series.pl -nu raw_ 1 ' num2str(noParticles) ' out_ ' docInputFile];
+	disp(tfmCmd)
+	system(tfmCmd);
+
+	rmCmd = 'rm raw_0*spi';
+	disp(rmCmd);
+	system(rmCmd);
+
+	%% CCC calculation
+	% Read tilt angle file
+	for j = 1:size(taContent,1)
+        	if ~isempty(strfind(mtbList{2}{doubletId}, taContent{j,1}))
+            		tiltInfo  = taContent{j,2};
+	        	break;
+        	end
+	end
+	
+	% Initial docOutput
+	outputContent = zeros(noParticles, 7 + noReferences + 1);
+	outputContent(:,1:7) = docInputContent(:,1:7);
+	
+
+	for particleId = 1:noParticles
+		euler = docInputContent(particleId,1:3);
+		wedge = missing_wedge_3dse_arbitrary(vol_size, tiltAxisAngle, tiltInfo(2), tiltInfo(3), euler);
+
+		% Read particle & mask
+		particle = tom_spiderread2(['out_' sprintf('%0.3d', particleId) '.spi']);
+			
+		maxCorr = 0;
+		for classId = 1:noReferences
+			maskedParticle = threedmask(particle.data, cMask{classId});
+			mwRef = ifftn(cRef{classId}.*ifftshift(wedge), 'symmetric'); % Convolute with mw
+			mwMaskedRef = threedmask(mwRef, cMask{classId});
+
+			% Align
+			cc3 = tom_corr(tom_bandpass(maskedParticle, bndpass(1),bndpass(2),bndpass(3)), tom_bandpass(mwMaskedRef, bndpass(1),bndpass(2),bndpass(3)), 'xcf');
+			[trans, corr] = tom_peak2(cc3, box); 
+			trans = trans - extractRadius - 1;
+			% CCC			
+			disp(['CCC btw ' mtbList{1}{doubletId} ' particle ' sprintf('%0.3d', particleId) ' with Ref ' sprintf('%0.3d', classId) ': ' sprintf('%6.5f', corr)]);
+
+			outputContent(particleId, 7 + classId + 1) = corr;
+			if (corr > maxCorr)
+				outputContent(particleId, 8) = classId;				
+				maxCorr = corr;
+				maxTrans = [trans(2) trans(1) trans(3)];
+				outputContent(particleId, 4:6) = docInputContent(particleId, 4:6) + [trans(2) trans(1) trans(3)];
+			end
+		end
+
+		classId = outputContent(particleId, 8);
+		if (classId > 0) && (outputContent(particleId, 7) > lowerLimit) && (outputContent(particleId, 7 + classId + 1) > classLowerLimit)	
+		        alnParticle = tom_shift(particle.data, [maxTrans(2) maxTrans(1) maxTrans(3)]);
+			cParticle{classId} = cParticle{classId} +  alnParticle;
+			cWeight{classId} = cWeight{classId} + wedge;
+		end		
+		
+	end
+
+	% Write document file
+	write_spider_doc(outputContent, docOutputFile);
+
+	% Write to log file
+	fprintf(fid, '%15s', mtbList{1}{doubletId});
+	for classId = 0:noReferences
+		classStat(classId+1) = classStat(classId+1) + sum(outputContent(:,8) == classId);
+		fprintf(fid, '%10d', sum(outputContent(:,8) == classId));
+	end
+	fprintf(fid, '\n');
+
+	% write output 
+	for classId = 1:noReferences
+		avgFile = [currDir '/'  mtbList{1}{doubletId} '_c' sprintf('%0.3d', classId) '.spi'];
+		cOutput{classId} = cOutput{classId} + cParticle{classId};
+		disp(['Writing ' avgFile]);
+		tom_spiderwrite2(avgFile, cParticle{classId});
+	end
+		
+	% Clean up
+	cleanCmd = ['rm *.*'];
+	disp(cleanCmd);
+	system(cleanCmd);
+
+end
+
+% Write to log file
+fprintf(fid, '%15s', 'Total number');
+for classId = 0:noReferences
+	fprintf(fid, '%10d', classStat(classId+1));
+end
+fprintf(fid, '\n\n');
+fclose(fid);
+
+cd(currDir);
+system(['rm -R ' tmpDir]);
+
+% Write output
+for classId = 1:noReferences
+	classAvgFile = regexprep(origAvgFile, '\.spi', ['_iter' sprintf('%0.2d', iterationNo) '_ref' num2str(noReferences) '_c' sprintf('%0.3d', classId) '.spi']);
+	classAvgCorrFile = regexprep(classAvgFile, '\.spi', '_cr\.spi');
+	classWeightFile = ['weight_' classAvgFile];
+	disp(['Writing ' classAvgFile]);
+	tom_spiderwrite2(classAvgFile, cOutput{classId});
+	disp(['Writing ' classWeightFile]);
+	tom_spiderwrite2(classWeightFile, cWeight{classId});
+	disp(['Writing ' classAvgCorrFile]);
+	calc_weighted_avg(classAvgFile, classWeightFile, classAvgCorrFile);
+end
+
+exit;
+

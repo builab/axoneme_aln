@@ -1,0 +1,133 @@
+%-------------------------------------------------------------
+% TEMPLATE
+% @purpose Roughly align subaverage and reference using inplane search with mirror
+% @version 1.0
+% @date 20080301
+%-------------------------------------------------------------
+%%% --- START HEADER ---
+listFile = #s#ListFile#; 
+refFile = #s#Reference#;
+noSliceToAvg = #d#NumberOfSlicesToAverage#;
+lowFreq = #d#LowPassFreq#;
+hiFreq = #d#HighPassFreq#;
+sigma = #d#Sigma#;
+objectSize = #d#ObjectSize#;
+maxXYTranslation = #d#MaxXYTranslation#;
+maxZTranslation =  #d#MaxZTranslation#;
+iteration = #d#InplaneAlnIteration#;
+doZTranslation = #d#DoRoughAlnZTranslation#;
+angleLowerLimit = #d#AngleLowerLimit#;
+angleUpperLimit = #d#AngleUpperLimit#;
+critLimit = #d#MaxPeakLowerLimit#;
+searchDirection = #d#SearchDirection#;
+%%% --- END HEADER -----
+
+% ---- Program default ---------
+docDir = 'doc';
+graphDir = 'graph';
+
+% ------------------------------
+
+isMirror = 0
+
+disp(['List: ' listFile])
+disp(['Ref: ' refFile])
+disp('');
+
+[mtb_list, number_of_records] = parse_list(listFile);
+ref = tom_spiderread2(refFile);
+ref = ref.data;
+ref = ifftn(fftn(ref).*ifftshift(bp_filter(size(ref), lowFreq, hiFreq, sigma)), 'symmetric');
+ref2d = sum(ref(:,:, floor(size(ref,3)/2) - floor(noSliceToAvg/2) + 1: floor(size(ref,3)/2)+floor(noSliceToAvg/2)), 3);
+ref2d = vol2double(ref2d);
+origin = floor(size(ref)/2) + 1;
+box_init =  [origin(1)/2 origin(1)*3/2 ...
+            origin(2)/2 origin(2)*3/2];
+box = [origin(1)-maxXYTranslation origin(1)+maxXYTranslation ...
+    origin(2)-maxXYTranslation origin(2)+maxXYTranslation ...
+    origin(3)-maxZTranslation origin(3)+maxZTranslation];
+
+potentialFailure = [];
+
+for doubletId = 1:number_of_records
+    imFile = [mtb_list{1}{doubletId} '.spi'];
+    vol = tom_spiderread2(imFile);
+    vol = vol.data;
+    vol = ifftn(fftn(vol).*ifftshift(bp_filter(size(vol), lowFreq, hiFreq, sigma)), 'symmetric');
+
+    
+    im = sum(vol(:,:, floor(size(vol,3)/2) - floor(noSliceToAvg/2) + 1: floor(size(vol,3)/2)+floor(noSliceToAvg/2)), 3);
+    % Masking circular mask
+    
+    circular_mask = tom_sphere(size(im), floor(min(size(im))/2) - 15, 3);
+    bg_val = sum(sum(im.*circular_mask))/sum(sum(circular_mask));
+    im = im.*circular_mask + bg_val*(1-circular_mask);
+
+    % Inplane alignment	
+   	[trans,rot, delta, moved_part]=tom_align2d(im,ref2d,objectSize, maxXYTranslation, iteration);
+    im_aln = tom_rotate(vol2double(im), -rot);
+
+	if searchDirection == 1
+		im_mr = fliplr(im);		
+    	[trans_mr,rot_mr, delta_mr, moved_part_mr]=tom_align2d(im_mr,ref2d,objectSize, maxXYTranslation, iteration);
+   		im_mr_aln = tom_rotate(vol2double(im_mr), -rot_mr);
+		if tom_ccc(im_mr_aln, ref2d, 'norm') > tom_ccc(im_aln, ref2d, 'norm')
+			im = im_mr;
+			im_aln = im_mr_aln;
+			trans = trans_mr;
+			rot = rot_mr;
+			isMirror = 1;
+		end
+	end
+
+    im_aln = tom_shift(im_aln, trans);
+    im_aln = vol2double(im_aln);
+    im_out = zeros(size(im,1), size(im,2)*2);
+    im_out(:,1:size(im,1)) = vol2double(im);
+    im_out(:,size(im,1)+1:end)=im_aln;
+    imwrite(flipud(im_out), [graphDir '/RoughAln_' mtb_list{1}{doubletId} '.png']);
+
+    transform = zeros(1,7);
+    transform(1) = -rot;
+    transform(4:5) = [trans(2) trans(1)];
+    transform(7) = tom_ccc(im_aln, ref2d, 'norm');
+
+ 
+    if isMirror == 1
+        % Combine with mirror operation
+        euler = euler_from_matrix3(matrix3_from_euler(transform(1:3))*matrix3_from_euler([0 180 0]));
+        transform(1:3) = euler;
+    end
+
+    if (doZTranslation) 
+        % Z alignment   
+        vol_rot = tom_rotate(vol, [transform(1) transform(3) transform(2)]);
+        vol_aln = tom_shift(vol_rot, [transform(5) transform(4) 0]);
+        cc3 = tom_corr(vol_aln, ref, 'xcf');
+        [c3d, val3d] = tom_peak2(cc3, box);
+        c3d = c3d - origin;
+        
+        transform(4:6) = transform(4:6) + [c3d(2) c3d(1) c3d(3)];
+        transform(7) = val3d;
+    end
+    
+    if (transform(7) < critLimit)
+        potentialFailure = [potentialFailure; doubletId];
+    end
+
+    % Write output  
+    write_spider_doc(transform, [docDir '/doc_rough_' mtb_list{1}{doubletId} '.spi']);
+    disp([mtb_list{1}{doubletId} ' -> ' sprintf('%7.2f %7.2f %7.2f %7.2f %7.2f %7.2f    %5.4f', transform)])    
+end
+
+if isempty(potentialFailure)
+	exit;
+end
+
+disp('');
+disp('Potential Failure Doublet');
+for i = 1:size(potentialFailure, 1)
+	disp(['   ' mtb_list{1}{potentialFailure(i)}]);
+end
+
+exit;

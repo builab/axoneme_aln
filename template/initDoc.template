@@ -1,0 +1,60 @@
+%-------------------------------------------------------------
+% TEMPLATE
+% @purpose Generate initial document with estimated Euler angles
+% @version 1.2
+% @date 20080301
+% @update 20110102 using the new flagella_model function
+%         20110107 incorporate individual rotation angle in flagellaModel
+%-------------------------------------------------------------
+%%% --- START HEADER ---
+listFile = #s#ListFile#;
+pixelSize = #d#PixelSize#;
+sortDim = #d#SortDim#;
+doGuessPsi= #d#DoGuessPsi#;
+%%% --- END HEADER -----
+
+% ---- Program default ---------
+starDir = 'star';
+docDir = 'doc';
+graphDir = 'graph';
+initDocPrefix = 'doc_init_';
+smoothingLimit = 13;
+% ------------------------------
+
+disp(['List File: ' listFile])
+disp(['Sort Dim: ' num2str(sortDim)])
+disp(['Pixel Size: ' num2str(pixelSize)])
+
+[mtbList, number_of_records] = parse_list(listFile);
+flagellaList = parse_flagella_name_from_list(mtbList);
+
+for i = 1:numel(flagellaList)
+    flagName = flagellaList{i};
+    [doubletList, subMtbList] = get_doublet_list(mtbList, number_of_records, flagName);
+    ptsList = {};
+    for doubletId = doubletList
+        starFile = [starDir '/' subMtbList{2}{doubletId} '.star'];
+        disp(['Reading ' starFile]);
+        origin = parse_star_file(starFile, 'origin');
+        ptsList{doubletId} = origin;
+    end
+
+    flagellaModel = flagella_model_from_pts(ptsList, doubletList, subMtbList{3}(doubletList(1)), sortDim, smoothingLimit, pixelSize);
+    draw_flagella_model(flagellaModel, doubletList, flagName, [graphDir '/' flagName '_model.tif'], [graphDir '/' flagName '_model_cs.tif']);
+
+    for doubletId = doubletList
+        docInitFile = [docDir '/' initDocPrefix subMtbList{1}{doubletId} '.spi'];
+	transform = zeros(size(flagellaModel(doubletId).IndRotAng, 1), 7);
+        transform(:, 7) = ones(size(transform, 1), 1);
+        transform(:, 1:2) = flagellaModel(doubletId).IndRotAng(:,1:2);
+
+        % Get estimated psi from flagella model
+        if (doGuessPsi)
+            transform(:,3) = flagellaModel(doubletId).IndRotAng(:,3);
+        end
+        disp(['Writing ' docInitFile])
+        write_spider_doc(transform, docInitFile);
+    end
+end
+
+exit;

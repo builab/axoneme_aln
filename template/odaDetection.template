@@ -1,0 +1,154 @@
+%%----------------------------------------------------------------------------
+% Script: odaDetection.m
+% Purpose: Script to do detect the presence of outer dynein arms
+% Author: Huy Bui
+% Date: 20080423
+%%----------------------------------------------------------------------------
+%%% --- START HEADER ---
+listFile =  #s#ListFile#;
+taFile =  #s#TiltAngleFile#;
+refFile =  #s#Reference#;
+maskFile = #s#OdaMask#;
+extractRadius = #d#ExtractParticleRadius#;
+%%% --- END HEADER -----
+
+% --- Program default --
+starDir = 'star';
+docDir =  'doc';
+inputDocPrefix = 'doc_total_';
+outputDocPrefix = 'doc_detect_';
+bndpass =  [1 12 3]; % Normally fixed
+outputLogFile = 'oda_detect.log';
+%%% --- END HEADER -----
+
+
+vol_size = [extractRadius*2 extractRadius*2 extractRadius*2];
+
+disp(['List: ' listFile])
+disp(['Ref: ' refFile]);
+disp(['Mask ' maskFile]);
+disp(['Tilt Ange List: ' taFile]);
+disp(['Input Doc. Prefix: ' inputDocPrefix]);
+disp(['Output Doc. Prefix: ' outputDocPrefix]);
+
+[mtb_list, number_of_records] = parse_list(listFile);
+taContent = parse_ta_list(taFile);
+
+% Read reference
+ref = tom_spiderread2(refFile);
+ref = ref.data;
+refFt = fftn(ref); % Save processing time
+
+% Read mask
+mask = tom_spiderread2(maskFile);
+mask = mask.data;
+
+% Log file
+fid = fopen(outputLogFile, 'at');
+fprintf(fid, '---------------------------\nDetection running at %s\n', datestr(now));
+fprintf(fid, '%15s', 'DoubletId');
+fprintf(fid, '%10s %10s\n', 'No', 'Yes');
+
+
+% Making a random temporary dir
+rand('twister', sum(100*clock));
+tmpDir = ['tmp_dir' num2str(rand(1,1))];
+mkdir(tmpDir);
+cd(tmpDir)
+
+for doubletId = 1:number_of_records
+	% Initialize
+	starFile = ['../' starDir '/' mtb_list{2}{doubletId} '.star'];
+	docInputFile = ['../' docDir '/' inputDocPrefix mtb_list{1}{doubletId} '.spi'];
+	docOutputFile = ['../' docDir '/' outputDocPrefix mtb_list{1}{doubletId} '.spi'];
+
+	disp(starFile)	
+	disp(docInputFile)
+	disp(docOutputFile)
+	
+ 	docInputContent = parse_spider_doc(docInputFile);
+	number_of_particles = size(docInputContent, 1);
+	
+	% Linking
+	lnStarCmd = ['ln -s ' starFile];
+	lnDocDirCmd = ['ln -s ' docInputFile];
+	disp(lnStarCmd)
+	disp(lnDocDirCmd)
+	system(lnStarCmd);
+	system(lnDocDirCmd);
+
+	% Picking
+	pick_cmd = ['bpick -extract ' num2str(extractRadius) ' -background -normalize ' starFile];
+	disp(pick_cmd)
+	system(pick_cmd);
+
+	% Spliting
+	split_cmd = ['bsplit -first 1 *.pif raw.spi'];
+	disp(split_cmd)
+	system(split_cmd);
+
+	% Transform according to input document
+	tfm_cmd = ['/mol/ish/Data/programs/perl_script/tfm_series.pl -nu raw_ 1 ' num2str(number_of_particles) ' out_ ' inputDocPrefix mtb_list{1}{doubletId} '.spi'];
+	disp(tfm_cmd)
+	system(tfm_cmd);
+
+	%% CCC calculation
+	% Read tilt angle file
+	for j = 1:size(taContent,1)
+        	if ~isempty(strfind(mtb_list{2}{doubletId}, taContent{j,1}))
+            		tilt_info  = taContent{j,2};
+	        	break;
+        	end
+	end
+	
+	% Initial docOutput
+	outputContent = zeros(number_of_particles, 9);
+	outputContent(:,1:7) = docInputContent;
+	
+	for particleId = 1:number_of_particles
+			euler = docInputContent(particleId,1:3);
+			wedge = missing_wedge_3d_arbitrary(vol_size, tilt_info(1), tilt_info(2), tilt_info(3), euler);
+
+			% Read particle
+			particle = tom_spiderread2(['out_' sprintf('%0.3d', particleId) '.spi']);
+
+			% convolute with mw
+			mwRef = ifftn(refFt.*wedge, 'symmetric');
+			% Masking
+			mwMaskedRef = threedmask(mwRef, mask);
+			maskedParticle = threedmask(particle.data, mask);
+			
+			% CCC			
+			corr = prcorr2(tom_bandpass(mwMaskedRef, bndpass(1),bndpass(2),bndpass(3)), tom_bandpass(maskedParticle, bndpass(1),bndpass(2),bndpass(3)));
+			disp(['CCC btw ' mtb_list{1}{doubletId} ' particle ' sprintf('%0.3d', particleId) ' with Ref: ' sprintf('%6.5f', corr)]);
+
+			if (corr > 0)
+				outputContent(particleId, 8) = 1;
+				outputContent(particleId, 9) = corr;
+			end
+	end
+		
+
+
+	% Write document file
+	write_spider_doc(outputContent, docOutputFile);
+
+	% Log
+	fprintf(fid, '%15s', mtb_list{1}{doubletId});
+	fprintf(fid, '%10d %10d\n', sum(outputContent(:,8) == 0), sum(outputContent(:,8) == 1));
+
+	% Clean up
+	cleanCmd = ['rm *.*'];
+	disp(cleanCmd);
+	system(cleanCmd);
+
+end
+
+% Write to log file
+fclose(fid);
+
+cd('..');
+system(['rm -R ' tmpDir]);
+
+exit;
+
