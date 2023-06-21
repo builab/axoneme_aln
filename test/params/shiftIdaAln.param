@@ -1,0 +1,14 @@
+ShiftIdaDocPrefix doc_shift_
+CombinedIdaDocPrefix doc_cbn_
+LowResReferenceFile chlamy_ida_v1_low.spi
+ReferenceMask chlamy_ida_3dmask.spi
+ReferenceDir /mol/ish/Data/Huy_tmp/chlamy_new
+LowPassFreq .01
+HighPassFreq .08
+GaussianHalfWidth 3
+CrossCorrelationLowerX 91
+CrossCorrelationUpperX 111
+CrossCorrelationLowerY 91
+CrossCorrelationUpperY 111
+CrossCorrelationLowerZ 81
+CrossCorrelationUpperZ 121

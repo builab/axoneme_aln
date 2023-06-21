@@ -1,0 +1,85 @@
+function in = write_x3d_crd(crd_in, crd_file)
+% WRITE_X3D_CRD writes x3d coordinate file
+%		in = write_x3d_crd(crd_in, crd_file)
+% PARAMETERS
+%  IN
+%   crd structure contains the coordinate
+%  OUT
+%   crd_file x3d coordinate file
+% HB 2009/11/18
+
+% defaultHeader
+in = -1;
+defaultHeader.FILENAME = 'default.crd';
+defaultHeader.CRD_VERSION = '2';
+defaultHeader.PIC_FILENAME = '''default.tif''';
+defaultHeader.PIC_FLIPFLAG = 'F';
+defaultHeader.FLIPALLROWSFLAG = 'F';
+defaultHeader.INVERT_INTENSTY = 'F';
+defaultHeader.ANGSTROMS      = '0.000000';
+defaultHeader.CONTRAST        = '3.000000';
+defaultHeader.BRIGHTNESS      = '0.000000';
+defaultHeader.OUTFILE_PREFIX  = '''''';
+defaultHeader.OUTFILE_START   = '1';
+defaultHeader.OUTFILE_WIDTH   = '3';
+defaultHeader.OUTFILE_TYPE    = '''PIF''';
+defaultHeader.OD_CONVERT      = 'F';
+defaultHeader.RADIUS          = '85';
+defaultHeader.RADIUS_BAD      = '65';
+defaultHeader.FADE            = '3';
+defaultHeader.EXTRACT_DX      = '201';
+defaultHeader.EXTRACT_DY      = '201';
+defaultHeader.FINAL_DX        = '175';
+defaultHeader.FINAL_DY        = '175';
+defaultHeader.FINAL_MEAN      = '127';
+defaultHeader.FINAL_STDDEV    = '40';
+defaultHeader.SKIPMASKFLAG    = 'F';
+defaultHeader.SKIPGRADIENTFLAG= 'T';
+
+if ~isstruct(crd_in)
+    crd.DATA = crd_in;
+    crd.HEADER = defaultHeader;
+else
+    crd = crd_in;
+end
+
+% Writing header
+fid = fopen(crd_file, 'wt');
+fprintf(fid, ' $TRIMNEWPARAMETERS\n');
+fprintf(fid, ' %-18s= %s,\n', 'CRD_VERSION', crd.HEADER.CRD_VERSION);
+fprintf(fid, ' %-18s= %s,\n', 'PIC_FILENAME', crd.HEADER.PIC_FILENAME);
+fprintf(fid, ' %-18s= %s,\n', 'PIC_FLIPFLAG', crd.HEADER.PIC_FLIPFLAG);
+fprintf(fid, ' %-18s= %s,\n', 'FLIPALLROWSFLAG', crd.HEADER.FLIPALLROWSFLAG);
+fprintf(fid, ' %-18s= %s,\n', 'INVERT_INTENSTY', crd.HEADER.INVERT_INTENSTY);
+fprintf(fid, ' %-18s= %s,\n', 'ANGSTROMS', crd.HEADER.ANGSTROMS);
+fprintf(fid, ' %-18s= %s,\n', 'CONTRAST', crd.HEADER.CONTRAST);
+fprintf(fid, ' %-18s= %s,\n', 'BRIGHTNESS', crd.HEADER.BRIGHTNESS);
+fprintf(fid, ' %-18s= %s,\n', 'OUTFILE_PREFIX', crd.HEADER.OUTFILE_PREFIX);
+fprintf(fid, ' %-18s= %s,\n', 'OUTFILE_START', crd.HEADER.OUTFILE_START);
+fprintf(fid, ' %-18s= %s,\n', 'OUTFILE_WIDTH', crd.HEADER.OUTFILE_WIDTH);
+fprintf(fid, ' %-18s= %s,\n', 'OUTFILE_TYPE', crd.HEADER.OUTFILE_TYPE);
+fprintf(fid, ' %-18s= %s,\n', 'OD_CONVERT', crd.HEADER.OD_CONVERT);
+fprintf(fid, ' %-18s= %s,\n', 'RADIUS', crd.HEADER.RADIUS);
+fprintf(fid, ' %-18s= %s,\n', 'RADIUS_BAD', crd.HEADER.RADIUS_BAD);
+fprintf(fid, ' %-18s= %s,\n', 'FADE', crd.HEADER.FADE);
+fprintf(fid, ' %-18s= %s,\n', 'EXTRACT_DX', crd.HEADER.EXTRACT_DX);
+fprintf(fid, ' %-18s= %s,\n', 'EXTRACT_DY', crd.HEADER.EXTRACT_DY);
+fprintf(fid, ' %-18s= %s,\n', 'FINAL_DX', crd.HEADER.FINAL_DX);
+fprintf(fid, ' %-18s= %s,\n', 'FINAL_DY', crd.HEADER.FINAL_DY);
+fprintf(fid, ' %-18s= %s,\n', 'FINAL_MEAN', crd.HEADER.FINAL_MEAN);
+fprintf(fid, ' %-18s= %s,\n', 'FINAL_STDDEV', crd.HEADER.FINAL_STDDEV);
+fprintf(fid, ' %-18s= %s,\n', 'SKIPMASKFLAG', crd.HEADER.SKIPMASKFLAG);
+fprintf(fid, ' %-18s= %s,\n', 'SKIPGRADIENTFLAG', crd.HEADER.SKIPGRADIENTFLAG);
+fprintf(fid, ' $END\n');
+% Writing data
+for i = 1:length(crd.DATA)
+    fprintf(fid, '%6d %7d%7d\n', i, crd.DATA(i,1), crd.DATA(i,2));    
+end
+
+if ~isempty(crd.DATA_BAD) 
+	for i = 1:length(crd.DATA_BAD)
+		fprintf(fid, '%6d %7d%7d\n', -i, crd.DATA_BAD(i,1), crd.DATA_BAD(i,2));
+	end
+end
+fclose(fid);
+in = 1;

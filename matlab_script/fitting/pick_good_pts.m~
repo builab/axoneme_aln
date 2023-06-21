@@ -1,0 +1,54 @@
+function [coor, indx] = pick_good_pts(points, spacing, tolerance)
+% PICK_GOOD_PTS picks good points on the array of point having a specific
+% spacing.
+%   [coor, val] = pick_good_pts(points, spacing, tolerance)
+% Parameters
+%   points Nx3 array of points
+%   spacing spacing needed
+%   tolerance deviation from spacing tolerated
+%   coor coordinate of satisfy points
+%   indx index of point in the array
+% Algorithm 
+%   check forward & backward for a continous 3 points satisfy the 
+% tolerance limit, use that point as the starting points.
+%
+% HB 20080128
+
+distance  = [0 sqrt(sum((diff(points, 1, 1)).^2,2))']';
+res_err = mod(distance, spacing);
+indx = res_err > (spacing/2);
+
+
+corr_res_err = abs(res_err - indx*spacing);
+
+good_pts = find(corr_res_err <= tolerance);
+
+% Finding good points
+start_indx = floor(size(points,1)/2);
+
+% Forward search
+fwd_list = good_pts(good_pts > start_indx);
+rev_list = good_pts(good_pts <= start_indx);
+
+good_start = 0;
+
+for i = 1:length(fwd_list)-1
+    if fwd_list(i) == fwd_list(i+1) - 1
+        good_start = fwd_list(i);
+        break;
+    end
+end
+
+if good_start == 0
+for i = length(rev_list):2
+    if rev_list(i) == rev_list(i-1) + 1
+        good_start = rev_list(i);
+        break;
+    end
+end
+end
+
+% Return the good_start
+
+indx = good_start;
+coor = points(indx, :);

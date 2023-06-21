@@ -1,0 +1,15 @@
+% Check host name
+[s, aaDir] = unix('env | grep ''AA_DIR=''');
+
+aaDir = regexprep(aaDir, 'AA_DIR=', '');
+
+% Add path tombox
+addpath(genpath('/mol/ish/Data/programs/tom'))
+
+% Addpath library
+addpath(genpath([aaDir '/matlab']))
+
+% Add extra library
+addpath(genpath('/mol/ish/Data/programs/aa_test/matlab_script'));
+
+

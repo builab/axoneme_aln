@@ -1,0 +1,48 @@
+function stack = av3_prepstack(particlefilename, motl, mask, ibin, iclass, s_rotate);
+
+% av3_prepstack convert 3D tomograms into stack
+%
+% USAGE
+%   stack = av3_prepstack(particlefilename, motl, mask, ibin, iclass);
+%
+% PARAMETERS
+
+error(nargchk(3,6,nargin));
+if (nargin < 6) s_rotate=false; end;
+if (nargin < 5) iclass=0; end;
+if (nargin < 4) ibin=0; end;
+icount = 0;
+for indpart = 1:size(motl,2) 
+    if ( motl(20,indpart) == iclass )
+        icount = icount +1;
+        xshift = motl(11,indpart);
+        yshift = motl(12,indpart);
+        zshift = motl(13,indpart);
+        tshift = [xshift yshift zshift];
+        ifile = motl(4,indpart);
+        name = [particlefilename '_' num2str(ifile) '.em'];
+        tmp = tom_emread(name);tmp = tmp.Value;
+        tmp = tom_limit(tmp,-3,3,'z'); % throw away the gold
+        
+        tmp = mask.*tom_shift(tmp,-tshift);
+        if (s_rotate)
+            phi = motl(17,indpart);
+            psi = motl(18,indpart);
+            the = motl(19,indpart);
+            tmp = tom_rotate(tmp,[-psi,-phi,-the]);
+        end;
+        if (ibin > 0)
+            tmp = tom_bin(tmp,ibin);
+        end;
+        tmp=reshape(tmp, [1, size(tmp,1)*size(tmp,2)*size(tmp,3)]);
+        if (icount ==1)
+            kk = find(tmp~=0);
+            stack = zeros(1,size(kk,2));
+        end;
+        tmp = tmp(kk);
+        mn = mean(tmp);stdx=std(tmp);
+        tmp = (tmp-mn)/stdx;
+        stack(icount,:) = tmp(1,:);
+        disp(['Particle no ' num2str(ifile) ' added to stack'  ]);
+    end;%if - threshold
+end;

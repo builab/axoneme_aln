@@ -1,0 +1,2 @@
+MAKE fit_ida with initial model better
+PARALLELIZE REFINED ALIGNMENT

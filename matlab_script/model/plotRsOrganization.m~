@@ -1,0 +1,66 @@
+%%--------------------------------------------------------
+% Script: plotRsOrganization.m
+% Purspose: plot Radial spoke Organization around the central pair
+% Date: 2010/11/08
+%%--------------------------------------------------------
+
+dataset = 'wt22';
+upperY = 1200; % Only use particle in this region, better to choose the region with round shape
+lowerY = 800; % 
+
+% CPC
+threshold = .2;
+
+% output file
+outputFile = [dataset '_rs_organization.png'];
+
+% default parameter
+docPrefix = 'doc_total_';
+pixelSize = .68571; %nm
+period = 96; %nm
+
+close all
+figure
+
+zarray = [];
+
+for doubletId = 1:9
+	docInputFile = [docPrefix dataset '_ida_v1_' sprintf('%0.3d', doubletId) '.spi'];
+	starFile = [dataset '_ida_v1_' num2str(doubletId) '.star'];
+	disp(['Reading ' docInputFile]);
+	disp(['Reading ' starFile]);
+	
+	docInputContent = parse_spider_doc(docInputFile);
+	origin = parse_star_file(starFile, 'origin');
+
+	% Find point id
+	[minValue, pointId] = min(abs(origin(:,2) - (upperY+lowerY)/2));
+
+	point = origin(pointId,:);
+	xform = docInputContent(pointId,:);
+
+	shift = xform(4:6);
+	rot = xform(1:3);
+
+	mat3 = matrix3_from_euler(rot);
+	
+	origin_xform = (mat3*point' + shift')';
+    zarray = [zarray; origin_xform(3)];
+    
+    %plot(origin_xform(1), origin_xform(2), '*b');
+    %hold on
+end
+
+zdiff = [0; diff(zarray)]*pixelSize;
+zdiff = mod(zdiff, ones(9, 1)*period); % Convert to all positive
+
+zcumm = cumsum(zdiff); % Convert to cummulative sum to draw
+
+plot([1:9]', zcumm, '+b')
+axis([0 9.5 0 600]);
+title('Radial spoke organization around the central pair')
+xlabel('Doublet number')
+ylabel('Distance along the central pair')
+%axis equal
+%box on
+hold off

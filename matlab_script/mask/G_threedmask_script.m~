@@ -1,0 +1,21 @@
+%----------------------------------------------------------
+% Script G_threedmask_script.m
+% @purpose To join 2 masks with different orientations
+% @version 1.0
+% @date 20080429
+%----------------------------------------------------------
+
+% ---- TO CHANGE ------------------------------------------
+mask1_file = 'mask/RS1_3d_tight_mask_new.spi';
+mask2_file = 'mask/tetra_rs_85_3dmask.spi';
+output_file = 'mask/RS1_3d_tight_mask_new.spi';
+% ----- DON'T CHANGE AFTER THIS LINE ----------------------
+
+
+mask1 = tom_spiderread2(mask1_file);
+mask2 = tom_spiderread2(mask2_file);
+
+
+output = mask1.data .* mask2.data;
+
+tom_spiderwrite2(output_file, output);

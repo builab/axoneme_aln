@@ -1,0 +1,63 @@
+$TRIMNEWPARAMETERS
+CRD_VERSION       = 2,
+PIC_FILENAME      = '/mol/ish/Data/Huy_tmp/matlab_dir/auto_pick_2d/test.tif',
+PIC_FLIPFLAG      = F,
+FLIPALLROWSFLAG   = F,
+INVERT_INTENSTY   = F,
+ANGSTROMS         = 2.23,
+CONTRAST          = 3.000000,
+BRIGHTNESS        = 0.000000,
+OUTFILE_PREFIX    = 'test_x_fitted',
+OUTFILE_START     = 1,
+OUTFILE_WIDTH     = 3,
+OUTFILE_TYPE      = 'PIF',
+OD_CONVERT        = F,
+RADIUS            = 291,
+RADIUS_BAD        = 50,
+FADE              = 3,
+EXTRACT_DX        = 590,
+EXTRACT_DY        = 590,
+FINAL_DX          = 582,
+FINAL_DY          = 582,
+FINAL_MEAN        = 127,
+FINAL_STDDEV      = 40,
+SKIPMASKFLAG      = F,
+SKIPGRADIENTFLAG  = F,
+$END
+     1     256   2822
+     2     342   2756
+     3     428   2692
+     4     517   2630
+     5     606   2570
+     6     696   2512
+     7     788   2456
+     8     882   2402
+     9     976   2351
+    10    1072   2302
+    11    1169   2256
+    12    1268   2213
+    13    1368   2173
+    14    1468   2136
+    15    1571   2102
+    16    1675   2071
+    17    1779   2045
+    18    1883   2022
+    19    1990   2002
+    20    2096   1987
+    21    2203   1976
+    22    2310   1968
+    23    2418   1965
+    24    2526   1966
+    25    2634   1972
+    26    2740   1981
+    27    2847   1994
+    28    2954   2011
+    29    3059   2032
+    30    3163   2057
+    31    3268   2086
+    32    3369   2118
+    33    3471   2153
+    34    3572   2192
+    35    3671   2234
+    36    3770   2279
+    37    3865   2325

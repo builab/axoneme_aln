@@ -1,0 +1,8 @@
+function content = parse_spider_doc(spiderFile)
+% PARSE_SPIDER_DOC to get content
+%   content = parse_spider_doc(spiderFile)
+% HB 20080206
+
+unix(['cat ' spiderFile ' | grep ''^[[:space:]]*[0-9]''  > aln.txt']);
+content = load('aln.txt');
+content = content(:, 3:end);

@@ -1,0 +1,23 @@
+% ----------------------------------------------
+% Script: trim_rs (19k)
+% Purpose: Trim radial spoke for surface render display
+% @date 20100403
+% ----------------------------------------------
+
+inputFile = 'avg/wt_regen_1x_dc_avg_cr_masked_filt_inv.spi';
+outputFile = 'avg/wt_regen_1x_dc_avg_cr_masked_filt_inv_trim.spi';
+
+vol = tom_spiderread2(inputFile);
+img = vol.data;
+
+[m n p] = size(img);
+
+if m == 128
+    im = img(:,99:128,:);
+    img(:,99:128,:) = im*0 + img(87, 78, 70);
+else
+    im = img(:,154:200,:);
+    img(:,154:200,:) = im*0 + img(136, 122, 109);
+end
+
+tom_spiderwrite2(outputFile, img);

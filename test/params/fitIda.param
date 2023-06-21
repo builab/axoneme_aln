@@ -1,0 +1,7 @@
+Periodicity 96
+SortingAlong Y
+DocAlnPrefix doc_total_
+InitIdaDocPrefix doc_init_
+ToleranceAngle 10
+ToleranceDistance 4
+ExclusionLimit .11

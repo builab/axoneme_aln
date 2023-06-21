@@ -1,0 +1,10 @@
+fla33 0
+fla34 1
+fla41 0
+fla51 1
+fla52 1
+fla53 1
+fla61 1
+fla62 0
+fla63 0
+fla64 0

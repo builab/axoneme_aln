@@ -1,0 +1,262 @@
+function [c, v] = tom_peak2(varargin)
+% TOM_PEAK determines the coordinates and value of the maximum of an array
+% (2d, 3d).
+% [c val] = tom_peak(A)
+%
+% [c val] = tom_peak(A,'spline')
+% If the flag 'spline' is set the coordinates are determined with subpixel
+% accuracy. When there are several pixels with the same maximum value, only the first will be reported.(A spline function is fitted between the next neighbours of the pixel with max value.
+% The maxima of the interpolation functions are determined for each dimension independently.)
+%
+% [c val] = tom_peak(A, box);
+% [c val] = tom_peak(A, box, 'spline');
+%
+% PARAMETERS
+%   INPUT
+%   A       array - 1d, 2d or 3d
+%   R       double number; Radius to set values to 0
+%   FLAG    can be set to 'spline' for subpixel accuracy
+%
+%   OUTPUT
+%   c       coordinates of the maximum
+%   val     value of the maximum
+%   M       array with all elements set to zero in the circle R
+%
+%
+% EXAMPLE
+%
+%               1   2   3   4   17
+%               5   6   7   8   18
+%           A = 10  9   40  6   20
+%               12  16  17  20  30
+%               5   23  35  12  6
+%
+%           [c val] = tom_peak(A)
+%           c = [3 3]
+%           val = 40
+%
+%           [c val] = tom_peak(A,'spline')
+%           c = [3.0890    2.9770]
+%           val = 40.2232
+%
+%           [c val M] = tom_peak(A,2,'spline')
+%           c = [3.0890    2.9770]
+%           val = 40.2232
+%               1   2   0   4   17
+%               5   0   0   0   18
+%           M = 0   0   0   0   0
+%               12  0   0   0   30
+%               5   23  0   12  6
+%
+% SEE ALSO
+%    TOM_LIMIT, TOM_PASTE
+%
+%
+%    copyright (c) 2004
+%    TOM toolbox for Electron Tomography
+%    Max-Planck-Institute for Biochemistry
+%    Dept. Molecular Structural Biology
+%    82152 Martinsried, Germany
+%    http://www.biochem.mpg.de/tom
+%
+%
+%  20081015 HB, totally modified for more robustness & clear code
+
+doSpline = 0;
+isBoxed = 0;
+
+switch (nargin)
+    case  0
+        error('Not enough Arguments');
+
+        %------------------------------------------------------------------------------
+
+
+    case  1                                    % no radius given, no interpolation
+        a=varargin{1};
+
+        %--------------------------------------------------------------------
+
+
+    case  2
+        a=varargin{1};
+
+        if strcmp(varargin{2},'spline')               % no radius given, spline interpolation used
+            % for subpixel accuracy
+            % output arguments: c    position
+            %                   v    value of maximum                                                    %                   val
+
+            doSpline = 1;
+
+            %-----------------------------------------------------------------
+        else 
+            box = varargin{2};
+			isValid = isValidBox(box, size(a));             		
+			if isValid == 1          
+				isBoxed = 1;
+			else
+				error('box size or box value invalid!');
+			end
+
+        end
+
+        %----------------------------------------------------------------
+
+    case 3                                              % interpolation used to determine max value and position
+        a=varargin{1};
+        box = varargin{2};
+        isValid = isValidBox(box, size(a));             		
+			if isValid == 1          
+				isBoxed = 1;
+            else
+              	error('box size or box value invalid!');
+			end  
+end
+
+if isBoxed
+   mask = zero(size(a));
+	if size(a, 3) == 1                    
+			mask(box(3):box(4),box(1):box(2)) = 1;
+			min_a = min(min(a));
+		else 
+			mask(box(3):box(4),box(1):box(2),box(5):box(6)) = 1;
+			min_a = min(min(min(a)));
+		end
+        a = (1-mask).*min_a + a.*mask;
+		[c, v] = tom_intpeak(a);
+
+end
+
+%%-----------------------------------------------------------------------
+function [c,val]=tom_intpeak(a)
+
+% TOM_INTPEAK determines Value and position of maximum of a matrix to
+%   subpixel accuracy(a spline function is fitted between the next neighbours of the pixel with maximum value.
+%   The maximums of the interpolation functions are determined for each dimension independently.)
+%
+%   07.04.04 GS
+
+
+x_1 = 1:0.001:3;
+x   = 1:3;
+
+
+if size(a,3) == 1                              %2d Matrix
+    v=max(max(a));
+    [s1 s2]=find(a==v);
+    s1=s1(1); s2=s2(1);
+    if s1 == 1 || s1==dim1
+        c(1)=s1;
+        val(1)=v;
+    else
+        peak(1:3)=a(s1-1:s1+1,s2);
+        y_1=interp1( x ,peak, x_1,'spline');
+        [val(1),pos_peak]=max(y_1);
+        c(1)=s1-1+(pos_peak-1)*0.001;
+    end
+    if s2 == 1 || s2==dim2
+        c(2)=s2;
+        val(2)=v;
+    else
+        peak(1:3)=a(s1,s2-1:s2+1);
+        y_1=interp1( x ,peak, x_1,'spline');
+        [val(2),pos_peak]=max(y_1);
+        c(2)=s2-1+(pos_peak-1)*0.001;
+    end
+
+    val=max(val);
+
+else                                                          % 3d Matrix
+    v=max(max(max(a)));
+    [s1 s2 s3] = find(a==v);
+    s1=s1(1); s2=s2(1); s3=s3(1);
+    s3=floor((s2-1)/size(a,2)) + 1;
+    s2=rem((s2-1),dim2)+1;
+
+
+    if s1 == 1 || s1 == dim1
+        c(1)=s1;
+        val(1)=v;
+    else
+        peak(1:3)=a(s1-1:s1+1,s2,s3);
+        y_1=interp1( x ,peak, x_1,'spline');
+        [val(1),pos_peak]=max(y_1);
+        c(1)=s1-1+(pos_peak-1)*0.001;
+    end
+    if s2 == 1 || s2 == dim2
+        c(2) = s2;
+        val(2)=v;
+    else
+        peak(1:3)=a(s1,s2-1:s2+1,s3);
+        y_1=interp1( x ,peak, x_1,'spline');
+        [val(2),pos_peak]=max(y_1);
+        c(2)=s2-1+(pos_peak-1)*0.001;
+    end
+
+    if s3 == 1 || s3==dim3
+        c(3)=s3;
+        val(3)=v;
+    else
+        peak(1:3)=a(s1,s2,s3-1:s3+1);
+        y_1=interp1( x ,peak, x_1,'spline');
+        [val(3),pos_peak]=max(y_1);
+        c(3)=s3-1+(pos_peak-1)*0.001;
+
+    end
+
+    val=max(val);
+end
+
+%%-----------------------------------------------------------------------
+
+function [c v] = tom_simple_peak(a)
+% TOM_SIMPLE_PEAK  (2d, 3d).
+% [c val] = tom_simple_peak(A)               
+               
+[dim1 dim2 dim3]=size(a);        
+                     
+if dim3 == 1
+          v=max(max(a));
+          [s1 s2]=find(a==v);
+          c=[s1(1) s2(1)];
+else                
+          v=max(max(max(a)));
+          [s1 s2 s3]=find(a==v);        
+          s3 = floor((s2(1)-1)/dim2) + 1;
+          ss2=rem(s2(1)-1,dim2)+1;
+         c=[s1(1) ss2 s3];
+end
+                
+%%-----------------------------------------------------------------------
+
+function isValid = isValidBox(box, dims)
+% ISVALIDBOX check if a box is valid
+%      box [xmin xmax ymin ymax] or [xmin xmax ymin ymax zmin zmax]    
+%	   dims dimension of matrix
+
+isValid = 1;
+if dims(3) == 1
+    if length(box) ~=4
+        isValid = 0;
+    end
+else
+    if length(box) ~=6
+        isValid = 0;
+    end
+    if min(box(5:6)) < 1 || max(box(5:6)) > dims(3)
+        isValid = 0;
+    end
+end
+
+if min(box(1:2)) < 1 || max(box(1:2)) > dims(1)
+    isValid = 0;
+end
+if min(box(3:4)) < 1 || max(box(3:4)) > dims(2)
+    isValid = 0;
+end
+
+
+
+
+
+

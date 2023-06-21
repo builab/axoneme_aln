@@ -1,0 +1,12 @@
+ReferenceFile chlamy_ref_low.spi
+LowPassFreq .01
+HighPassFreq .08
+GaussianHalfWidth 3
+ExtractParticleRadius 100
+CrossCorrelationLowerX 81
+CrossCorrelationUpperX 121
+CrossCorrelationLowerY 81
+CrossCorrelationUpperY 121
+CrossCorrelationLowerZ 81
+CrossCorrelationUpperZ 121
+SearchRadius 80

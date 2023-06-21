@@ -1,0 +1,20 @@
+function tfm_points = transform_pts(points, transform)
+% TRANSFORM_PTS transform points
+%   tfm_points = transform_pts(points, transform)
+% Parameters
+%   Points array N x 3
+%   transform N x 6 with 3 euler angles & 3 shift parameters
+%   tfm_points transformed points
+%
+% HB 20080116
+
+tfm_points = zeros(size(points));
+
+for j = 1:size(points, 1)
+    euler = transform(j,1:3);
+    mat = matrix3_from_euler(euler);
+	revMat = inv(mat);
+    shift = -transform(j,4:6);
+    tfm_points(j,:) = (revMat*shift')' + points(j,:); % shift back
+end
+

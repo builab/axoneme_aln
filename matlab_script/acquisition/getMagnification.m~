@@ -1,0 +1,15 @@
+function mag = getMagnification(mode)
+% Get magnification of the each mode
+% 	mag = getMagnification(mode)
+% Parameters
+%	IN
+%		mode can be 'search', 'focus', 'exposure'
+%	OUT
+%		corresponding magnification
+
+switch mode
+    case 'search' 
+        mag = 5600;
+    case 'focus'
+        mag = 80000;
+    case '

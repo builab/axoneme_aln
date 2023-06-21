@@ -1,0 +1,13 @@
+IntraIdaDocPrefix doc_intra_
+ExtractParticleRadius 100
+NumberOfParticlesToAverage 4
+LowPassFreq .01
+HighPassFreq .08
+GaussianHalfWidth 3
+CrossCorrelationLowerX 91
+CrossCorrelationUpperX 111
+CrossCorrelationLowerY 91
+CrossCorrelationUpperY 111
+CrossCorrelationLowerZ 91
+CrossCorrelationUpperZ 111
+SearchRadius 80

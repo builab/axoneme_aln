@@ -1,0 +1,29 @@
+function content = parse_star_file(starFile, parameter)
+% PARSE_STAR_FILE parse bsoft star file
+% 	content = parse_star_file(starFile, parameter);
+% Parameters
+%	starFile star file to parse
+%	parameter to retrieve
+%		'origin'
+% TODO improve to get more properties, or put the content in a structure
+% HB 20080201
+
+starTxt = 'star.txt';
+cmd = ['cat ' starFile ' | grep ''^[[:space:]]*[0-9]'' > ' starTxt];
+disp(cmd)
+unix(cmd);
+content = load(starTxt);
+
+if nargin == 2
+	switch parameter
+		case 'origin'
+			content = content(:,3:5);
+		otherwise
+	end
+end
+
+disp(content)
+% Clean up
+unix(['rm ' starTxt]);
+
+

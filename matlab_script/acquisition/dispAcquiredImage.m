@@ -1,0 +1,2 @@
+function dispAcquiredImage
+%	dispAcquiredImage

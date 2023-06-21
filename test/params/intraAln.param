@@ -1,0 +1,12 @@
+ExtractParticleRadius 100
+NumberOfParticlesToAverage 10
+LowPassFreq .01
+HighPassFreq .08
+GaussianHalfWidth 3
+CrossCorrelationLowerX 81
+CrossCorrelationUpperX 121
+CrossCorrelationLowerY 81
+CrossCorrelationUpperY 121
+CrossCorrelationLowerZ 81
+CrossCorrelationUpperZ 121
+SearchRadius 85

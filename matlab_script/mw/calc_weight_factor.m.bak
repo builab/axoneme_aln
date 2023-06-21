@@ -1,0 +1,44 @@
+function weight = calc_weight_factor(vol_size, align_file, ta_list, lower_limit)
+% CALC_WEIGHT_FACTOR calculate weight factor from align file & ta_list
+%       weight = calc_weight_factor(vol_size, align_file, ta_list, lower_limit)
+%	 
+% Parameters
+%	align_file file *.mw
+%	ta_list file produced by generate_ta_list.pl
+%	size size of weight factor
+%	lower_limit limit of CCC for not including in final reconstruction
+%
+% HB 20071202
+% 20071206 using new missing_wedge_3d_arbitrary
+% 20080305 add number of wedge processed indicator
+% 20080317 add lower limit to calculate weight
+% 20081216 make tilt axis = -90
+	
+if nargin < 4
+	lower_limit = 0;
+end
+
+tilt_axis_angle = 90;
+
+align_info = load(align_file);
+ta_info = load(ta_list);
+
+if size(align_info, 2) < 4
+	error([align_file ' has only 3 columns']);
+end
+
+% Create original wedge info
+weight = zeros(vol_size);
+
+% Using lower limit
+good_indx = align_info(:, 4)  > lower_limit;
+align_info = align_info(good_indx, 1:3);
+ta_info = ta_info(good_indx, :);
+
+for i = 1:size(align_info,1)
+    wedge = missing_wedge_3dse_arbitrary(vol_size, tilt_axis_angle, ta_info(i,3), ta_info(i,4), align_info(i,:));
+    weight = weight + wedge;
+	if rem(i,10) == 0
+		disp(i)
+	end
+end
