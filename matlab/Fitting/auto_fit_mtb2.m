@@ -1,0 +1,101 @@
+function new_origins = auto_fit_mtb(origins, periodicity, sortDim, fittingType)
+% AUTO_FIT_MTB auto pick points on mtb based on a few points with a
+% specified periodicity.
+%   new_origins = auto_fit_mtb(origins, periodicity)
+% Parameters
+%   origins origins of a few points (from .star file)
+%   periodicity     periodicity of newly picked points
+%   sortDim         sorting dimension
+%   fittingType	    algorithm for fitting star file
+%	'2dquad'	2d inplane quadratic curve
+%	'line'		line connecting original points
+%	'spline'	B-spline interpolation
+%   new_origins origins from fitted with specified periodicity
+%
+% HB 20080121
+
+if nargin == 3
+	fittingType = '2dquad';
+end
+
+if sortDim == 1
+    rdim = [2 3];
+elseif sortDim == 2
+    rdim = [1 3];
+else
+    rdim = [1 2];
+end
+
+[sorted_var, sort_indx] = sort(origins(:,sortDim));
+
+switch fittingType
+	case '2dquad'
+		var1 = origins(sort_indx, rdim(1));
+		var2 = origins(sort_indx, rdim(2));
+
+		p1 = polyfit(sorted_var, var1, 2);
+		p2 = polyfit(sorted_var, var2, 2);
+
+		sorted_vari = linspace(sorted_var(1), sorted_var(end), 3000);
+		var1i = polyval(p1, sorted_vari);
+		var2i = polyval(p2, sorted_vari);
+
+		if sortDim == 1
+		    oxyzi = [sorted_vari; var1i ; var2i]';
+		elseif sortDim == 2
+		    oxyzi = [var1i ; sorted_vari; var2i]';
+		else
+		    oxyzi = [var1i ; var2i; sorted_vari]';
+		end
+	case 'line'
+		oxyzi = [];
+		no_pts = size(origins, 1);
+		pts_in_segment = round(3000/(no_pts - 1));
+		for segment = 1 : no_pts - 1
+			var1 = origins(sort_indx(segment:segment+1), rdim(1));
+			var2 = origins(sort_indx(segment:segment+1), rdim(2));
+
+			p1 = polyfit(sorted_var(segment:segment+1), var1, 1);
+			p2 = polyfit(sorted_var(segment:segment+1), var2, 1);			
+			
+			sorted_vari = linspace(sorted_var(segment), sorted_var(segment + 1), pts_in_segment);
+			var1i = polyval(p1, sorted_vari);
+			var2i = polyval(p2, sorted_vari);
+
+	        if sortDim == 1
+        	    segment_pts  = [sorted_vari; var1i ; var2i]';
+    	    elseif sortDim == 2
+            	segment_pts  = [var1i ; sorted_vari; var2i]';
+	        else
+    	        segment_pts  = [var1i ; var2i; sorted_vari]';
+        	end
+			
+			oxyzi = [oxyzi ; segment_pts];
+        end
+        
+    case 'spline'
+        dep_var = origins(sort_indx, rdim);
+		
+		sorted_vari = linspace(sorted_var(1), sorted_var(end), 3000);
+        vari = spline(sorted_var, dep_var', sorted_vari);
+        if sortDim == 1
+		    oxyzi = [sorted_vari; vari(1, :) ; vari(2, :)]';
+		elseif sortDim == 2
+		    oxyzi = [vari(1, :) ; sorted_vari; vari(2, :)]';
+		else
+		    oxyzi = [vari(1, :) ; vari(2, :); sorted_vari]';
+        end
+        
+	otherwise
+		error('Unknown fittingType');
+end
+
+%plot3(oxyzi(:,1), oxyzi(:,2), oxyzi(:,3), 'r.-')
+%axis([1 2000 1 2000 1 300]);
+
+len = [0 ; cumsum(sqrt(sum(diff(oxyzi, 1, 1).^2,2)),1)];
+
+pick_ind = bf_pick(len, 1, periodicity);
+
+new_origins = oxyzi(pick_ind, :);
+
